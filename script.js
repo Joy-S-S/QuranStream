@@ -126,15 +126,19 @@ document.addEventListener('DOMContentLoaded', function () {
             const now = Date.now();
             state.userRecordings = state.userRecordings.filter(r => r.expiry > now);
             
-            // حفظ التغييرات بعد التصفية
-            if (state.userRecordings.length !== allRecordings[state.deviceId]?.length) {
-                saveRecordings();
-            }
+            // تحديث حالة التسجيلات النشطة مع الخادم
+            state.userRecordings.forEach(rec => {
+                if (!rec.completed) {
+                    // إذا كان التسجيل لم يكتمل بعد، نعتبره منتهيًا
+                    rec.expiry = now - 1;
+                }
+            });
             
+            // حفظ التغييرات بعد التصفية
+            saveRecordings();
             updateRecordingsList();
         } catch (error) {
             console.error('فشل تحميل التسجيلات:', error);
-            localStorage.removeItem(STORAGE_KEY);
             state.userRecordings = [];
         }
     }
@@ -193,21 +197,32 @@ document.addEventListener('DOMContentLoaded', function () {
             const expiryDate = new Date();
             expiryDate.setDate(expiryDate.getDate() + RECORDING_EXPIRY_DAYS);
             
-            const newRecording = {
-                id: state.recordingSessionId,
-                startTime: new Date(state.recordingStartTime),
-                duration: data.duration,
-                expiry: expiryDate.getTime(),
-                parts: data.parts || []
-            };
+            // تحديث التسجيل الحالي بدلاً من إنشاء جديد
+            const currentRecording = state.userRecordings.find(
+                r => r.id === state.recordingSessionId
+            );
             
-            state.userRecordings.push(newRecording);
+            if (currentRecording) {
+                currentRecording.duration = data.duration || 0;
+                currentRecording.parts = data.parts || [];
+                currentRecording.expiry = expiryDate.getTime();
+                currentRecording.completed = true;
+            } else {
+                state.userRecordings.push({
+                    id: state.recordingSessionId,
+                    startTime: new Date(state.recordingStartTime),
+                    duration: data.duration || 0,
+                    expiry: expiryDate.getTime(),
+                    parts: data.parts || [],
+                    completed: true
+                });
+            }
+            
             saveRecordings();
             updateRecordingsList();
         })
         .catch(error => {
             console.error('فشل إيقاف التسجيل:', error);
-            // إيقاف التسجيل محلياً حتى لو فشل الاتصال بالخادم
             clearInterval(state.recordingInterval);
             state.isRecording = false;
             elements.recordBtn.classList.remove('recording');
