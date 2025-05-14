@@ -189,6 +189,24 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    function downloadRecording(sessionId) {
+        fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.urls && data.urls.length > 0) {
+                    data.urls.forEach(url => {
+                        window.open(url, '_blank');
+                    });
+                } else {
+                    alert('لا يوجد أجزاء مسجلة للتحميل');
+                }
+            })
+            .catch(error => {
+                console.error('فشل تحميل التسجيل:', error);
+                alert('تعذر تحميل التسجيل');
+            });
+    }
+
     function deleteRecording(sessionId) {
         if (!confirm('هل أنت متأكد من حذف هذا التسجيل؟')) return;
 
@@ -237,24 +255,31 @@ document.addEventListener('DOMContentLoaded', function () {
                     </span>
                 </div>
                 <div class="recording-item-actions">
+                    <button class="recording-item-btn download-all" data-id="${rec.id}">
+                        <i class="fas fa-download"></i> تحميل الكل
+                    </button>
                     ${rec.parts.map((part, i) => 
-                        `<button class="recording-item-btn download-item" data-url="${part}">
+                        `<button class="recording-item-btn download-part" data-url="${part}">
                             <i class="fas fa-download"></i> الجزء ${i+1}
                         </button>`
                     ).join('')}
-                    <button class="recording-item-btn delete" title="حذف">
+                    <button class="recording-item-btn delete" data-id="${rec.id}">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>`;
 
-            item.querySelectorAll('.download-item').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    window.open(btn.dataset.url, '_blank');
+            item.querySelector('.download-all').addEventListener('click', (e) => {
+                downloadRecording(e.target.closest('button').dataset.id);
+            });
+
+            item.querySelectorAll('.download-part').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    window.open(e.target.closest('button').dataset.url, '_blank');
                 });
             });
 
-            item.querySelector('.delete').addEventListener('click', () => {
-                deleteRecording(rec.id);
+            item.querySelector('.delete').addEventListener('click', (e) => {
+                deleteRecording(e.target.closest('button').dataset.id);
             });
 
             elements.recordingsList.appendChild(item);
@@ -287,10 +312,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         elements.downloadBtn.addEventListener('click', () => {
             if (state.recordingSessionId) {
-                const recording = state.userRecordings.find(r => r.id === state.recordingSessionId);
-                if (recording && recording.parts) {
-                    recording.parts.forEach(part => window.open(part, '_blank'));
-                }
+                downloadRecording(state.recordingSessionId);
             }
         });
         elements.volumeSlider.addEventListener('input', () => {
