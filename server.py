@@ -1,7 +1,5 @@
 from flask import Flask, send_file, send_from_directory
 from flask_socketio import SocketIO, emit
-import eventlet
-eventlet.monkey_patch()
 import requests
 import os
 from datetime import datetime, timedelta
@@ -13,7 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Lock
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 listener_count = 0
 
