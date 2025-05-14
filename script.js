@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     const destination = "";
-    const audioElement = new Audio(${destination}/stream);
+    const audioElement = new Audio(`${destination}/stream`);
     document.body.appendChild(audioElement);
 
     // تعريف جميع عناصر DOM
@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function startRecording() {
-        fetch(${destination}/start-record/${state.deviceId})
+        fetch(`${destination}/start-record/${state.deviceId}`)
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
                 return response.text();
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function stopRecording() {
         if (!state.recordingSessionId) return;
 
-        fetch(${destination}/stop-record/${state.deviceId}/${state.recordingSessionId})
+        fetch(`${destination}/stop-record/${state.deviceId}/${state.recordingSessionId}`)
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
 
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function downloadRecording(sessionId) {
-    fetch(${destination}/download/${state.deviceId}/${sessionId})
+    fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
         .then(response => {
             if (!response.ok) throw new Error("Network response was not ok");
             return response.json();
@@ -266,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function () {
 }
 
     function deleteRecording(sessionId) {
-        fetch(${destination}/delete-record/${state.deviceId}/${sessionId})
+        fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
 
@@ -325,7 +325,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const dateString = rec.startTime.toLocaleDateString();
             const expiryString = new Date(rec.expiry).toLocaleString();
 
-            item.innerHTML = 
+            item.innerHTML = `
                 <div class="recording-item-info">
                     <span class="recording-item-name">تسجيل ${timeString}</span>
                     <span class="recording-item-time">
@@ -342,7 +342,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <button class="recording-item-btn delete" title="حذف">
                         <i class="fas fa-trash"></i>
                     </button>
-                </div>
+                </div>`
             ;
 
             item.querySelector('.delete').addEventListener('click', () => {
@@ -362,11 +362,11 @@ document.addEventListener('DOMContentLoaded', function () {
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
-        return ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')};
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 
     function updateListenerCount() {
-        fetch(${destination}/listener-count)
+        fetch(`${destination}/listener-count`)
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
                 return response.text();
