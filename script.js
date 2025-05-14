@@ -382,21 +382,22 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ----- التهيئة ----- */
 
     function init() {
-        setupAudioControls();
-        setupRecordingControls();
-        setupLibraryControls();
-        loadRecordings();
+    setupAudioControls();
+    setupRecordingControls();
+    setupLibraryControls();
+    loadRecordings();
 
-        // تحديث عدد المستمعين كل 10 ثواني
-        setInterval(updateListenerCount, 10000);
-        updateListenerCount();
+    // تحديث عدد المستمعين كل 10 ثواني
+    setInterval(updateListenerCount, 10000);
+    updateListenerCount();
 
-        // تهيئة حالة زر التشغيل
-        audioElement.addEventListener('loadedmetadata', () => {
-            state.isPlaying = !audioElement.paused;
-            updatePlayButton();
-        });
-    }
+    // 👇 إضافة هذا السطر لتعيين حالة الزر كبداية (إيقاف تشغيل)
+    state.isPlaying = false;
+    updatePlayButton();
 
-    init();
-});
+    // تهيئة حالة زر التشغيل عند تحميل بيانات الصوت
+    audioElement.addEventListener('loadedmetadata', () => {
+        state.isPlaying = !audioElement.paused;
+        updatePlayButton();
+    });
+}
