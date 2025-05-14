@@ -124,13 +124,21 @@ document.addEventListener('DOMContentLoaded', function () {
             
             // تصفية التسجيلات المنتهية الصلاحية
             const now = Date.now();
-            state.userRecordings = state.userRecordings.filter(r => r.expiry > now);
+            state.userRecordings = state.userRecordings.filter(r => {
+                // تأكد من وجود expiry وتحويله إذا كان سلسلة نصية
+                const expiry = typeof r.expiry === 'string' ? new Date(r.expiry).getTime() : r.expiry;
+                return expiry > now;
+            });
+            
+            // تحويل startTime إذا كان سلسلة نصية
+            state.userRecordings = state.userRecordings.map(r => ({
+                ...r,
+                startTime: typeof r.startTime === 'string' ? new Date(r.startTime) : r.startTime,
+                expiry: typeof r.expiry === 'string' ? new Date(r.expiry).getTime() : r.expiry
+            }));
             
             // حفظ التغييرات بعد التصفية
-            if (state.userRecordings.length !== allRecordings[state.deviceId]?.length) {
-                saveRecordings();
-            }
-            
+            saveRecordings();
             updateRecordingsList();
         } catch (error) {
             console.error('فشل تحميل التسجيلات:', error);
@@ -141,10 +149,14 @@ document.addEventListener('DOMContentLoaded', function () {
 }
 
     function saveRecordings() {
-        const allRecordings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-        allRecordings[state.deviceId] = state.userRecordings;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(allRecordings));
-    }
+    const allRecordings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    allRecordings[state.deviceId] = state.userRecordings.map(r => ({
+        ...r,
+        startTime: r.startTime.toISOString(),
+        expiry: new Date(r.expiry).toISOString()
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(allRecordings));
+}
 
     function startRecording() {
     fetch(`${destination}/start-record/${state.deviceId}`)
