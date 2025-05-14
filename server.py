@@ -1,5 +1,3 @@
-from gevent import monkey
-monkey.patch_all()
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 import requests
@@ -14,7 +12,7 @@ from threading import Lock
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'secret!')
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # إعدادات Cloudinary
 cloudinary.config(
