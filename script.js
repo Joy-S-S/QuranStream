@@ -282,28 +282,31 @@ document.addEventListener('DOMContentLoaded', function () {
         const expiryString = new Date(rec.expiry).toLocaleString('ar-EG');
 
         item.innerHTML = `
-            <div class="recording-item-info">
-                <span class="recording-item-name">تسجيل ${timeString}</span>
-                <span class="recording-item-time">
-                    ${dateString} - ${formatTime(rec.duration || 0)}
-                </span>
-                <span class="recording-item-expiry">
-                    تنتهي في: ${expiryString}
-                </span>
-            </div>
-            <div class="recording-item-actions">
-                <button class="recording-item-btn download-all" data-id="${rec.id}">
-                    <i class="fas fa-download"></i> تحميل الكل
-                </button>
-                ${(rec.parts || []).map((part, i) => 
-                    `<button class="recording-item-btn download-part" data-url="${part.url || part}">
-                        <i class="fas fa-download"></i> الجزء ${i+1}
-                    </button>`
-                ).join('')}
-                <button class="recording-item-btn delete" data-id="${rec.id}">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>`;
+    <div class="recording-item-info">
+        <span class="recording-item-name">تسجيل ${timeString}</span>
+        <span class="recording-item-time">
+            ${dateString} - ${formatTime(rec.duration || 0)}
+        </span>
+        <span class="recording-item-expiry">
+            تنتهي في: ${expiryString}
+        </span>
+        <div class="recording-parts">
+            ${(rec.parts || []).map((part, i) => `
+                <div class="part-info">
+                    <span>الجزء ${i+1}: ${formatTime(part.duration || 240)}</span>
+                    <span>${formatFileSize(part.size)}</span>
+                </div>
+            `).join('')}
+        </div>
+    </div>
+    <div class="recording-item-actions">
+        <button class="recording-item-btn download-all" data-id="${rec.id}">
+            <i class="fas fa-download"></i> تحميل الكل
+        </button>
+        <button class="recording-item-btn delete" data-id="${rec.id}">
+            <i class="fas fa-trash"></i> حذف
+        </button>
+    </div>`;
 
         item.querySelector('.download-all').addEventListener('click', (e) => {
             downloadRecording(e.target.closest('button').dataset.id);
