@@ -124,21 +124,13 @@ document.addEventListener('DOMContentLoaded', function () {
             
             // تصفية التسجيلات المنتهية الصلاحية
             const now = Date.now();
-            state.userRecordings = state.userRecordings.filter(r => {
-                // تأكد من وجود expiry وتحويله إذا كان سلسلة نصية
-                const expiry = typeof r.expiry === 'string' ? new Date(r.expiry).getTime() : r.expiry;
-                return expiry > now;
-            });
-            
-            // تحويل startTime إذا كان سلسلة نصية
-            state.userRecordings = state.userRecordings.map(r => ({
-                ...r,
-                startTime: typeof r.startTime === 'string' ? new Date(r.startTime) : r.startTime,
-                expiry: typeof r.expiry === 'string' ? new Date(r.expiry).getTime() : r.expiry
-            }));
+            state.userRecordings = state.userRecordings.filter(r => r.expiry > now);
             
             // حفظ التغييرات بعد التصفية
-            saveRecordings();
+            if (state.userRecordings.length !== allRecordings[state.deviceId]?.length) {
+                saveRecordings();
+            }
+            
             updateRecordingsList();
         } catch (error) {
             console.error('فشل تحميل التسجيلات:', error);
@@ -149,14 +141,10 @@ document.addEventListener('DOMContentLoaded', function () {
 }
 
     function saveRecordings() {
-    const allRecordings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-    allRecordings[state.deviceId] = state.userRecordings.map(r => ({
-        ...r,
-        startTime: r.startTime.toISOString(),
-        expiry: new Date(r.expiry).toISOString()
-    }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(allRecordings));
-}
+        const allRecordings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        allRecordings[state.deviceId] = state.userRecordings;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(allRecordings));
+    }
 
     function startRecording() {
     fetch(`${destination}/start-record/${state.deviceId}`)
@@ -269,57 +257,6 @@ document.addEventListener('DOMContentLoaded', function () {
             `<p style="text-align: center; color: #7f8c8d;">لا توجد تسجيلات متاحة</p>`;
         return;
     }
-
-    state.userRecordings.sort((a, b) => b.startTime - a.startTime).forEach(rec => {
-        const item = document.createElement('div');
-        item.className = 'recording-item';
-
-        const timeString = rec.startTime.toLocaleTimeString('ar-EG');
-        const dateString = rec.startTime.toLocaleDateString('ar-EG');
-        const expiryString = new Date(rec.expiry).toLocaleString('ar-EG');
-
-        item.innerHTML = `
-            <div class="recording-item-info">
-                <span class="recording-item-name">تسجيل ${timeString}</span>
-                <span class="recording-item-time">
-                    ${dateString} - ${formatTime(rec.duration || 0)}
-                </span>
-                <span class="recording-item-expiry">
-                    تنتهي في: ${expiryString}
-                </span>
-            </div>
-            <div class="recording-item-actions">
-                <button class="recording-item-btn download-all" data-id="${rec.id}">
-                    <i class="fas fa-download"></i> تحميل الكل
-                </button>
-                ${(rec.parts || []).map((part, i) => 
-                    `<button class="recording-item-btn download-part" data-url="${part.url || part}">
-                        <i class="fas fa-download"></i> الجزء ${i+1}
-                    </button>`
-                ).join('')}
-                <button class="recording-item-btn delete" data-id="${rec.id}">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>`;
-
-        item.querySelector('.download-all').addEventListener('click', (e) => {
-            downloadRecording(e.target.closest('button').dataset.id);
-        });
-
-        item.querySelectorAll('.download-part').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const url = e.target.closest('button').dataset.url;
-                if (url) window.open(url, '_blank');
-            });
-        });
-
-        item.querySelector('.delete').addEventListener('click', (e) => {
-            deleteRecording(e.target.closest('button').dataset.id);
-        });
-
-        elements.recordingsList.appendChild(item);
-    });
-}
 
     state.userRecordings.sort((a, b) => b.startTime - a.startTime).forEach(rec => {
         const item = document.createElement('div');
