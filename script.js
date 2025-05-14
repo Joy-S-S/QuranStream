@@ -321,6 +321,57 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 }
 
+    state.userRecordings.sort((a, b) => b.startTime - a.startTime).forEach(rec => {
+        const item = document.createElement('div');
+        item.className = 'recording-item';
+
+        const timeString = rec.startTime.toLocaleTimeString('ar-EG');
+        const dateString = rec.startTime.toLocaleDateString('ar-EG');
+        const expiryString = new Date(rec.expiry).toLocaleString('ar-EG');
+
+        item.innerHTML = `
+            <div class="recording-item-info">
+                <span class="recording-item-name">تسجيل ${timeString}</span>
+                <span class="recording-item-time">
+                    ${dateString} - ${formatTime(rec.duration || 0)}
+                </span>
+                <span class="recording-item-expiry">
+                    تنتهي في: ${expiryString}
+                </span>
+            </div>
+            <div class="recording-item-actions">
+                <button class="recording-item-btn download-all" data-id="${rec.id}">
+                    <i class="fas fa-download"></i> تحميل الكل
+                </button>
+                ${(rec.parts || []).map((part, i) => 
+                    `<button class="recording-item-btn download-part" data-url="${part.url || part}">
+                        <i class="fas fa-download"></i> الجزء ${i+1}
+                    </button>`
+                ).join('')}
+                <button class="recording-item-btn delete" data-id="${rec.id}">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>`;
+
+        item.querySelector('.download-all').addEventListener('click', (e) => {
+            downloadRecording(e.target.closest('button').dataset.id);
+        });
+
+        item.querySelectorAll('.download-part').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const url = e.target.closest('button').dataset.url;
+                if (url) window.open(url, '_blank');
+            });
+        });
+
+        item.querySelector('.delete').addEventListener('click', (e) => {
+            deleteRecording(e.target.closest('button').dataset.id);
+        });
+
+        elements.recordingsList.appendChild(item);
+    });
+}
+
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
