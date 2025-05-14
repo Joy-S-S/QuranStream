@@ -8,6 +8,7 @@ import cloudinary
 import cloudinary.uploader
 from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Lock
+import time
 
 app = Flask(__name__)
 
@@ -63,39 +64,69 @@ def serve_static(path):
 def record_stream_segment(device_id, session_id):
     """تسجيل جزء من البث الصوتي"""
     try:
+        # التأكد من وجود مجلد التسجيلات
+        os.makedirs(RECORDINGS_DIR, exist_ok=True)
+        
         segment_file = os.path.join(RECORDINGS_DIR, f"recording_{session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp3")
         
         with recordings_lock:
+            if device_id not in active_recordings or session_id not in active_recordings[device_id]:
+                return
             active_recordings[device_id][session_id]['current_file'] = segment_file
             active_recordings[device_id][session_id]['files'].append(segment_file)
         
         # تسجيل البث في ملف مؤقت
-        with requests.get(STREAM_URL, stream=True) as r:
-            start_time = time.time()
-            with open(segment_file, 'wb') as f:
-                while (time.time() - start_time) < RECORDING_SEGMENT_DURATION and active_recordings.get(device_id, {}).get(session_id, {}).get('active', False):
-                    chunk = next(r.iter_content(chunk_size=1024), None)
-                    if chunk:
-                        f.write(chunk)
+        try:
+            with requests.get(STREAM_URL, stream=True, timeout=10) as r:
+                r.raise_for_status()
+                start_time = time.time()
+                with open(segment_file, 'wb') as f:
+                    while (time.time() - start_time) < RECORDING_SEGMENT_DURATION:
+                        with recordings_lock:
+                            if not active_recordings.get(device_id, {}).get(session_id, {}).get('active', False):
+                                break
+                        
+                        chunk = next(r.iter_content(chunk_size=1024), None)
+                        if chunk:
+                            f.write(chunk)
+                            f.flush()
+        except (requests.RequestException, IOError) as e:
+            print(f"خطأ في اتصال البث لـ Device {device_id}: {e}")
+            return
 
-        # رفع الملف إلى Cloudinary
+        # رفع الملف إلى Cloudinary إذا كان التسجيل لا يزال نشطاً
+        with recordings_lock:
+            if not (device_id in active_recordings and 
+                   session_id in active_recordings[device_id] and 
+                   active_recordings[device_id][session_id]['active']):
+                if os.path.exists(segment_file):
+                    os.remove(segment_file)
+                return
+
         if os.path.exists(segment_file) and os.path.getsize(segment_file) > 0:
-            public_id = f"quran_radio/{device_id}/recording_{session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            response = cloudinary.uploader.upload(
-                segment_file,
-                resource_type="video",
-                public_id=public_id
-            )
-            
-            with recordings_lock:
-                if 'cloudinary_urls' not in active_recordings[device_id][session_id]:
-                    active_recordings[device_id][session_id]['cloudinary_urls'] = []
-                active_recordings[device_id][session_id]['cloudinary_urls'].append(response['secure_url'])
-            
-            os.remove(segment_file)
+            try:
+                public_id = f"quran_radio/{device_id}/recording_{session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                response = cloudinary.uploader.upload(
+                    segment_file,
+                    resource_type="video",
+                    public_id=public_id
+                )
+                
+                with recordings_lock:
+                    if device_id in active_recordings and session_id in active_recordings[device_id]:
+                        if 'cloudinary_urls' not in active_recordings[device_id][session_id]:
+                            active_recordings[device_id][session_id]['cloudinary_urls'] = []
+                        active_recordings[device_id][session_id]['cloudinary_urls'].append(response['secure_url'])
+            except Exception as e:
+                print(f"خطأ في رفع التسجيل إلى Cloudinary: {e}")
+            finally:
+                if os.path.exists(segment_file):
+                    os.remove(segment_file)
 
     except Exception as e:
-        print(f"خطأ في تسجيل الجزء لـ Device {device_id}: {e}")
+        print(f"خطأ غير متوقع في تسجيل الجزء لـ Device {device_id}: {e}")
+        if 'segment_file' in locals() and os.path.exists(segment_file):
+            os.remove(segment_file)
 
 def record_stream(device_id, session_id):
     """إدارة عملية التسجيل على أجزاء"""
