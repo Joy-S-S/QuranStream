@@ -1,3 +1,4 @@
+from flask_socketio import SocketIO, emit
 from flask import Flask, Response, send_file, send_from_directory, jsonify
 import requests
 import os
@@ -9,6 +10,21 @@ import cloudinary.uploader
 from threading import Lock
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+listeners = 0
+
+@socketio.on('connect')
+def handle_connect():
+    global listeners
+    listeners += 1
+    emit('listeners_count', {'count': listeners}, broadcast=True)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    global listeners
+    listeners -= 1
+    emit('listeners_count', {'count': listeners}, broadcast=True)
 
 # إعدادات Cloudinary
 cloudinary.config(
