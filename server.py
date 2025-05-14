@@ -120,12 +120,11 @@ def stop_recording(device_id, session_id):
 def download_recording(device_id, session_id):
     with recordings_lock:
         if device_id in active_recordings and session_id in active_recordings[device_id]:
-            parts = active_recordings[device_id][session_id].get('parts', [])
-            if parts:
+            if 'cloudinary_url' in active_recordings[device_id][session_id]:
                 return jsonify({
-                    'urls': [part['url'] for part in parts]
+                    "urls": [active_recordings[device_id][session_id]['cloudinary_url']]
                 })
-    return jsonify({'error': 'لا يوجد تسجيل'}), 404
+    return jsonify({"error": "لا يوجد تسجيل"}), 404
 
 @app.route('/delete-record/<device_id>/<session_id>')
 def delete_recording(device_id, session_id):
