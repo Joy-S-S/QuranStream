@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const destination = "quranliveradio.up.railway.app";
+    const destination = "";
     const audioElement = new Audio(`${destination}/stream`);
     document.body.appendChild(audioElement);
 
