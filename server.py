@@ -93,17 +93,33 @@ def start_recording(device_id):
         })
 
 @app.route('/stop-record/<device_id>/<session_id>')
+@app.route('/stop-record/<device_id>/<session_id>')
 def stop_recording(device_id, session_id):
     with recordings_lock:
         if device_id in active_recordings and session_id in active_recordings[device_id]:
+            # تأخير بسيط للتأكد من اكتمال رفع الأجزاء
+            import time
+            time.sleep(2)
+            
             active_recordings[device_id][session_id]['active'] = False
             duration = (datetime.now() - active_recordings[device_id][session_id]['start_time']).seconds
+            
+            # انتظار حتى يكتمل رفع جميع الأجزاء
+            max_retries = 5
+            while max_retries > 0 and active_recordings[device_id][session_id].get('uploading', False):
+                time.sleep(1)
+                max_retries -= 1
+            
             return jsonify({
-                'message': 'تم إيقاف التسجيل',
+                'success': True,
+                'message': 'تم إيقاف التسجيل بنجاح',
                 'duration': duration,
                 'parts': [part['url'] for part in active_recordings[device_id][session_id].get('parts', [])]
             })
-        return jsonify({'error': 'لا يوجد تسجيل نشط'}), 404
+        return jsonify({
+            'success': False,
+            'error': 'لا يوجد تسجيل نشط'
+        }), 404
 
 @app.route('/download/<device_id>/<session_id>')
 def download_recording(device_id, session_id):
