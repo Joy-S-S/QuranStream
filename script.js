@@ -1,5 +1,14 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const audioElement = new Audio("https://stream.radiojar.com/8s5u5tpdtwzuv");
+    const audioElement = new Audio();
+    const mediaSource = new MediaSource();
+    let sourceBuffer;
+
+    audioElement.src = URL.createObjectURL(mediaSource);
+
+    mediaSource.addEventListener('sourceopen', () => {
+        sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
+        startStream();
+    });
     document.body.appendChild(audioElement);
 
     // تعريف جميع عناصر DOM
@@ -49,7 +58,29 @@ document.addEventListener('DOMContentLoaded', function () {
         state.deviceId = deviceId;
         return deviceId;
     }
+    function startStream() {
+        fetch('/stream')
+            .then(response => {
+                const reader = response.body.getReader();
 
+                function pushStream() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            console.log('Stream ended');
+                            return;
+                        }
+
+                        if (!sourceBuffer.updating) {
+                            sourceBuffer.appendBuffer(value);
+                        }
+
+                        pushStream();
+                    });
+                }
+
+                pushStream();
+            });
+    }
     // تحميل التسجيلات المحفوظة
     function loadRecordings() {
         initializeDeviceId();
@@ -110,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function () {
             audioElement.pause();
         } else {
             audioElement.play().catch(error => {
-                console.error('خطأ في التشغيل:', error);
+                console.error('Playback error:', error);
             });
         }
         state.isPlaying = !state.isPlaying;
