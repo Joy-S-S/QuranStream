@@ -100,6 +100,7 @@ def record_stream(device_id, session_id):
                         f.write(chunk)
 
         # رفع الملف إلى Cloudinary عند إيقاف التسجيل
+        print("حجم الملف:", os.path.getsize(recording_file))
         if os.path.exists(recording_file):
             public_id = f"quran_radio/{device_id}/recording_{session_id}"
             response = cloudinary.uploader.upload(
