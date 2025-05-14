@@ -6,14 +6,9 @@ import threading
 import uuid
 import cloudinary
 import cloudinary.uploader
-from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Lock
-from werkzeug.serving import WSGIRequestHandler
 
 app = Flask(__name__)
-
-# إجبار استخدام HTTP/1.1
-WSGIRequestHandler.protocol_version = "HTTP/1.1"
 
 # إعدادات Cloudinary
 cloudinary.config(
@@ -22,35 +17,46 @@ cloudinary.config(
     api_secret=os.getenv('API_SECRET')
 )
 
-# إعدادات البث المباشر
 STREAM_URL = "https://stream.radiojar.com/8s5u5tpdtwzuv"
 RECORDINGS_DIR = "temp_recordings"
-
-# تخزين جلسات التسجيل
-active_recordings = {}  # {device_id: {session_id: {'active': bool, 'file': str, 'thread': threading.Thread, 'expiry': datetime}}}
+active_recordings = {}
 recordings_lock = Lock()
 
-# إنشاء مجدول المهام
-scheduler = BackgroundScheduler()
-scheduler.start()
-
-def cleanup_expired_recordings():
-    """حذف التسجيلات القديمة من الذاكرة"""
-    with recordings_lock:
-        now = datetime.now()
-        for device_id in list(active_recordings.keys()):
-            for session_id in list(active_recordings[device_id].keys()):
-                if 'expiry' in active_recordings[device_id][session_id] and active_recordings[device_id][session_id]['expiry'] <= now:
-                    try:
-                        if os.path.exists(active_recordings[device_id][session_id]['file']):
-                            os.remove(active_recordings[device_id][session_id]['file'])
-                        del active_recordings[device_id][session_id]
-                        print(f"تم حذف التسجيل المنتهي: {session_id} لـ Device: {device_id}")
-                    except Exception as e:
-                        print(f"خطأ في حذف التسجيل المنتهي {session_id}: {e}")
-
-# جدولة التنظيف كل ساعة
-scheduler.add_job(cleanup_expired_recordings, 'interval', hours=1)
+def record_stream(device_id, session_id):
+    try:
+        part_number = 0
+        max_duration = 240  # 4 دقائق لكل جزء
+        
+        while active_recordings.get(device_id, {}).get(session_id, {}).get('active', False):
+            part_number += 1
+            recording_file = os.path.join(RECORDINGS_DIR, f"recording_{session_id}_part{part_number}.mp3")
+            
+            start_time = datetime.now()
+            with requests.get(STREAM_URL, stream=True, timeout=30) as r:
+                with open(recording_file, 'wb') as f:
+                    while (datetime.now() - start_time).seconds < max_duration and \
+                          active_recordings.get(device_id, {}).get(session_id, {}).get('active', False):
+                        chunk = next(r.iter_content(chunk_size=1024), None)
+                        if chunk:
+                            f.write(chunk)
+            
+            if os.path.exists(recording_file):
+                public_id = f"quran_radio/{device_id}/recording_{session_id}_part{part_number}"
+                response = cloudinary.uploader.upload(
+                    recording_file,
+                    resource_type="video"
+                )
+                if 'parts' not in active_recordings[device_id][session_id]:
+                    active_recordings[device_id][session_id]['parts'] = []
+                active_recordings[device_id][session_id]['parts'].append(response['secure_url'])
+                os.remove(recording_file)
+                
+    except Exception as e:
+        print(f"خطأ في التسجيل: {e}")
+    finally:
+        with recordings_lock:
+            if device_id in active_recordings and session_id in active_recordings[device_id]:
+                active_recordings[device_id][session_id]['active'] = False
 
 @app.route('/')
 def serve_index():
@@ -60,154 +66,56 @@ def serve_index():
 def serve_static(path):
     return send_from_directory('.', path)
 
-# عدد المستمعين
-listener_count = 0
-listener_lock = Lock()
-
-@app.route('/stream')
-def proxy_stream():
-    def generate():
-        global listener_count
-        
-        with listener_lock:
-            listener_count += 1
-            print(f"مستمع جديد متصل. الإجمالي: {listener_count}")
-        
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0',
-                'Accept': '*/*',
-                'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive'
-            }
-            
-            with requests.get(STREAM_URL, stream=True, headers=headers, timeout=30) as r:
-                r.raise_for_status()
-                for chunk in r.iter_content(chunk_size=1024):
-                    if chunk:
-                        yield chunk
-        except requests.exceptions.RequestException as e:
-            print(f"خطأ في البث: {e}")
-        finally:
-            with listener_lock:
-                listener_count -= 1
-                print(f"انقطع اتصال المستمع. الإجمالي: {listener_count}")
-    
-    response_headers = {
-        'Content-Type': 'audio/mpeg',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-        'Connection': 'keep-alive'
-    }
-    
-    return Response(generate(), headers=response_headers)
-
-@app.route('/listener-count')
-def get_listener_count():
-    with listener_lock:
-        return str(listener_count)
-
-def record_stream(device_id, session_id):
-    """تسجيل البث الصوتي وحفظه مؤقتًا ثم رفعه إلى Cloudinary"""
-    try:
-        recording_file = active_recordings[device_id][session_id]['file']
-
-        # تسجيل البث في ملف مؤقت
-        with requests.get(STREAM_URL, stream=True) as r:
-            with open(recording_file, 'wb') as f:
-                while active_recordings.get(device_id, {}).get(session_id, {}).get('active', False):
-                    chunk = next(r.iter_content(chunk_size=1024), None)
-                    if chunk:
-                        f.write(chunk)
-
-        # رفع الملف إلى Cloudinary عند إيقاف التسجيل
-        if os.path.exists(recording_file):
-            public_id = f"quran_radio/{device_id}/recording_{session_id}"
-            response = cloudinary.uploader.upload(
-                recording_file,
-                resource_type="video",  # Cloudinary يعامل الصوت كـ "فيديو"
-                public_id=public_id
-            )
-            print("تم رفع التسجيل إلى Cloudinary:", response['secure_url'])
-
-            # حفظ بيانات Cloudinary في active_recordings
-            active_recordings[device_id][session_id]['cloudinary_url'] = response['secure_url']
-            active_recordings[device_id][session_id]['cloudinary_public_id'] = response['public_id']
-
-            # حذف الملف المؤقت بعد الرفع
-            os.remove(recording_file)
-
-    except Exception as e:
-        print(f"خطأ في التسجيل لـ Device {device_id}: {e}")
-
-    finally:
-        with recordings_lock:
-            if device_id in active_recordings and session_id in active_recordings[device_id]:
-                active_recordings[device_id][session_id]['active'] = False
-
-
 @app.route('/start-record/<device_id>')
 def start_recording(device_id):
     with recordings_lock:
-        # إنشاء مجلد مؤقت إذا لم يكن موجودًا
         os.makedirs(RECORDINGS_DIR, exist_ok=True)
-        
         session_id = str(uuid.uuid4())
-        expiry_time = datetime.now() + timedelta(days=1)
-        recording_file = os.path.join(RECORDINGS_DIR, f"recording_{session_id}.mp3")
         
         if device_id not in active_recordings:
             active_recordings[device_id] = {}
         
         active_recordings[device_id][session_id] = {
             'active': True,
-            'file': recording_file,
-            'thread': None,
-            'expiry': expiry_time,
-            'cloudinary_url': None
+            'start_time': datetime.now(),
+            'parts': []
         }
         
         recording_thread = threading.Thread(target=record_stream, args=(device_id, session_id))
-        active_recordings[device_id][session_id]['thread'] = recording_thread
         recording_thread.start()
         
-        return session_id
+        return jsonify({
+            'session_id': session_id,
+            'message': 'بدء التسجيل بنجاح'
+        })
 
 @app.route('/stop-record/<device_id>/<session_id>')
 def stop_recording(device_id, session_id):
     with recordings_lock:
         if device_id in active_recordings and session_id in active_recordings[device_id]:
             active_recordings[device_id][session_id]['active'] = False
-            return "تم إيقاف التسجيل بنجاح", 200
-        return "لا يوجد تسجيل نشط لإيقافه", 400
-
-@app.route('/download/<device_id>/<session_id>')
-def download_recording(device_id, session_id):
-    with recordings_lock:
-        if device_id in active_recordings and session_id in active_recordings[device_id]:
-            if 'cloudinary_url' in active_recordings[device_id][session_id]:
-                return jsonify({"url": active_recordings[device_id][session_id]['cloudinary_url']})
-    return jsonify({"error": "لا يوجد تسجيل"}), 404
+            duration = (datetime.now() - active_recordings[device_id][session_id]['start_time']).seconds
+            return jsonify({
+                'message': 'تم إيقاف التسجيل',
+                'duration': duration,
+                'parts': active_recordings[device_id][session_id].get('parts', [])
+            })
+        return jsonify({'error': 'لا يوجد تسجيل نشط'}), 404
 
 @app.route('/delete-record/<device_id>/<session_id>')
 def delete_recording(device_id, session_id):
     with recordings_lock:
         if device_id in active_recordings and session_id in active_recordings[device_id]:
             try:
-                # حذف من Cloudinary لو موجود
-                if 'cloudinary_public_id' in active_recordings[device_id][session_id]:
-                    cloudinary.uploader.destroy(
-                        active_recordings[device_id][session_id]['cloudinary_public_id'],
-                        resource_type="video"
-                    )
-                # حذف من الذاكرة المؤقتة
+                if 'parts' in active_recordings[device_id][session_id]:
+                    for part_url in active_recordings[device_id][session_id]['parts']:
+                        public_id = part_url.split('/')[-1].split('.')[0]
+                        cloudinary.uploader.destroy(public_id, resource_type="video")
                 del active_recordings[device_id][session_id]
-                return "تم حذف التسجيل بنجاح", 200
+                return jsonify({'message': 'تم حذف التسجيل بنجاح'})
             except Exception as e:
-                return f"خطأ في حذف التسجيل: {str(e)}", 500
-    return "لا يوجد تسجيل", 404
-
+                return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'لا يوجد تسجيل'}), 404
 
 if __name__ == '__main__':
     os.makedirs(RECORDINGS_DIR, exist_ok=True)
