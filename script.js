@@ -116,18 +116,30 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function loadRecordings() {
-        initializeDeviceId();
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            try {
-                const allRecordings = JSON.parse(saved) || {};
-                state.userRecordings = allRecordings[state.deviceId] || [];
-                updateRecordingsList();
-            } catch (error) {
-                console.error('فشل تحميل التسجيلات:', error);
+    initializeDeviceId();
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+        try {
+            const allRecordings = JSON.parse(saved) || {};
+            state.userRecordings = allRecordings[state.deviceId] || [];
+            
+            // تصفية التسجيلات المنتهية الصلاحية
+            const now = Date.now();
+            state.userRecordings = state.userRecordings.filter(r => r.expiry > now);
+            
+            // حفظ التغييرات بعد التصفية
+            if (state.userRecordings.length !== allRecordings[state.deviceId]?.length) {
+                saveRecordings();
             }
+            
+            updateRecordingsList();
+        } catch (error) {
+            console.error('فشل تحميل التسجيلات:', error);
+            localStorage.removeItem(STORAGE_KEY);
+            state.userRecordings = [];
         }
     }
+}
 
     function saveRecordings() {
         const allRecordings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
@@ -159,35 +171,45 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function stopRecording() {
-        if (!state.recordingSessionId) return;
+    if (!state.recordingSessionId) return;
 
-        fetch(`${destination}/stop-record/${state.deviceId}/${state.recordingSessionId}`)
-            .then(response => response.json())
-            .then(data => {
-                clearInterval(state.recordingInterval);
-                state.isRecording = false;
-                elements.recordBtn.classList.remove('recording');
-                elements.downloadBtn.classList.remove('hidden');
+    fetch(`${destination}/stop-record/${state.deviceId}/${state.recordingSessionId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            if (!data.success) throw new Error(data.error || 'Failed to stop recording');
+            
+            clearInterval(state.recordingInterval);
+            state.isRecording = false;
+            elements.recordBtn.classList.remove('recording');
+            elements.downloadBtn.classList.remove('hidden');
 
-                const expiryDate = new Date();
-                expiryDate.setDate(expiryDate.getDate() + RECORDING_EXPIRY_DAYS);
-                
-                state.userRecordings.push({
-                    id: state.recordingSessionId,
-                    startTime: new Date(state.recordingStartTime),
-                    duration: data.duration,
-                    expiry: expiryDate.getTime(),
-                    parts: data.parts
-                });
-                
-                saveRecordings();
-                updateRecordingsList();
-            })
-            .catch(error => {
-                console.error('فشل إيقاف التسجيل:', error);
-                alert('تعذر إيقاف التسجيل');
-            });
-    }
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + RECORDING_EXPIRY_DAYS);
+            
+            const newRecording = {
+                id: state.recordingSessionId,
+                startTime: new Date(state.recordingStartTime),
+                duration: data.duration,
+                expiry: expiryDate.getTime(),
+                parts: data.parts || []
+            };
+            
+            state.userRecordings.push(newRecording);
+            saveRecordings();
+            updateRecordingsList();
+        })
+        .catch(error => {
+            console.error('فشل إيقاف التسجيل:', error);
+            // إيقاف التسجيل محلياً حتى لو فشل الاتصال بالخادم
+            clearInterval(state.recordingInterval);
+            state.isRecording = false;
+            elements.recordBtn.classList.remove('recording');
+            alert('تم إيقاف التسجيل محلياً ولكن قد تكون هناك مشكلة في الخادم');
+        });
+}
 
     function downloadRecording(sessionId) {
         fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
@@ -224,67 +246,64 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateRecordingsList() {
-        elements.recordingsList.innerHTML = '';
+    elements.recordingsList.innerHTML = '';
 
-        const now = Date.now();
-        state.userRecordings = state.userRecordings.filter(r => r.expiry > now);
-        saveRecordings();
-
-        if (state.userRecordings.length === 0) {
-            elements.recordingsList.innerHTML = 
-                `<p style="text-align: center; color: #7f8c8d;">لا توجد تسجيلات متاحة</p>`;
-            return;
-        }
-
-        state.userRecordings.sort((a, b) => b.startTime - a.startTime).forEach(rec => {
-            const item = document.createElement('div');
-            item.className = 'recording-item';
-
-            const timeString = rec.startTime.toLocaleTimeString();
-            const dateString = rec.startTime.toLocaleDateString();
-            const expiryString = new Date(rec.expiry).toLocaleString();
-
-            item.innerHTML = `
-                <div class="recording-item-info">
-                    <span class="recording-item-name">تسجيل ${timeString}</span>
-                    <span class="recording-item-time">
-                        ${dateString} - ${formatTime(rec.duration)}
-                    </span>
-                    <span class="recording-item-expiry">
-                        تنتهي في: ${expiryString}
-                    </span>
-                </div>
-                <div class="recording-item-actions">
-                    <button class="recording-item-btn download-all" data-id="${rec.id}">
-                        <i class="fas fa-download"></i> تحميل الكل
-                    </button>
-                    ${rec.parts.map((part, i) => 
-                        `<button class="recording-item-btn download-part" data-url="${part}">
-                            <i class="fas fa-download"></i> الجزء ${i+1}
-                        </button>`
-                    ).join('')}
-                    <button class="recording-item-btn delete" data-id="${rec.id}">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>`;
-
-            item.querySelector('.download-all').addEventListener('click', (e) => {
-                downloadRecording(e.target.closest('button').dataset.id);
-            });
-
-            item.querySelectorAll('.download-part').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    window.open(e.target.closest('button').dataset.url, '_blank');
-                });
-            });
-
-            item.querySelector('.delete').addEventListener('click', (e) => {
-                deleteRecording(e.target.closest('button').dataset.id);
-            });
-
-            elements.recordingsList.appendChild(item);
-        });
+    if (state.userRecordings.length === 0) {
+        elements.recordingsList.innerHTML = 
+            `<p style="text-align: center; color: #7f8c8d;">لا توجد تسجيلات متاحة</p>`;
+        return;
     }
+
+    state.userRecordings.sort((a, b) => b.startTime - a.startTime).forEach(rec => {
+        const item = document.createElement('div');
+        item.className = 'recording-item';
+
+        const timeString = rec.startTime.toLocaleTimeString('ar-EG');
+        const dateString = rec.startTime.toLocaleDateString('ar-EG');
+        const expiryString = new Date(rec.expiry).toLocaleString('ar-EG');
+
+        item.innerHTML = `
+            <div class="recording-item-info">
+                <span class="recording-item-name">تسجيل ${timeString}</span>
+                <span class="recording-item-time">
+                    ${dateString} - ${formatTime(rec.duration || 0)}
+                </span>
+                <span class="recording-item-expiry">
+                    تنتهي في: ${expiryString}
+                </span>
+            </div>
+            <div class="recording-item-actions">
+                <button class="recording-item-btn download-all" data-id="${rec.id}">
+                    <i class="fas fa-download"></i> تحميل الكل
+                </button>
+                ${(rec.parts || []).map((part, i) => 
+                    `<button class="recording-item-btn download-part" data-url="${part.url || part}">
+                        <i class="fas fa-download"></i> الجزء ${i+1}
+                    </button>`
+                ).join('')}
+                <button class="recording-item-btn delete" data-id="${rec.id}">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>`;
+
+        item.querySelector('.download-all').addEventListener('click', (e) => {
+            downloadRecording(e.target.closest('button').dataset.id);
+        });
+
+        item.querySelectorAll('.download-part').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const url = e.target.closest('button').dataset.url;
+                if (url) window.open(url, '_blank');
+            });
+        });
+
+        item.querySelector('.delete').addEventListener('click', (e) => {
+            deleteRecording(e.target.closest('button').dataset.id);
+        });
+
+        elements.recordingsList.appendChild(item);
+    });
+}
 
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
