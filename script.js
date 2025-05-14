@@ -148,27 +148,32 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function startRecording() {
-        fetch(`${destination}/start-record/${state.deviceId}`)
-            .then(response => response.json())
-            .then(data => {
-                state.recordingSessionId = data.session_id;
-                state.isRecording = true;
-                state.recordingStartTime = Date.now();
+    fetch(`${destination}/start-record/${state.deviceId}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            if (!data.session_id) throw new Error('Invalid session ID');
+            
+            state.recordingSessionId = data.session_id;
+            state.isRecording = true;
+            state.recordingStartTime = Date.now();
 
-                elements.recordBtn.classList.add('recording');
-                elements.recordingInfo.classList.remove('hidden');
-                elements.downloadBtn.classList.add('hidden');
+            elements.recordBtn.classList.add('recording');
+            elements.recordingInfo.classList.remove('hidden');
+            elements.downloadBtn.classList.add('hidden');
 
-                state.recordingInterval = setInterval(() => {
-                    const seconds = Math.floor((Date.now() - state.recordingStartTime) / 1000);
-                    elements.recordingTime.textContent = formatTime(seconds);
-                }, 1000);
-            })
-            .catch(error => {
-                console.error('فشل بدء التسجيل:', error);
-                alert('تعذر بدء التسجيل');
-            });
-    }
+            state.recordingInterval = setInterval(() => {
+                const seconds = Math.floor((Date.now() - state.recordingStartTime) / 1000);
+                elements.recordingTime.textContent = formatTime(seconds);
+            }, 1000);
+        })
+        .catch(error => {
+            console.error('فشل بدء التسجيل:', error);
+            alert('تعذر بدء التسجيل: ' + error.message);
+        });
+}
 
     function stopRecording() {
     if (!state.recordingSessionId) return;
