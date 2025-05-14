@@ -2,12 +2,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const destination = "https://quranliveradio.up.railway.app";
     let audioElement;
     let retryCount = 0;
-    const MAX_RETRIES = Infinity; // عدد غير محدود من المحاولات
-    const INITIAL_RETRY_DELAY = 1000; // 1 ثانية بداية
-    const MAX_RETRY_DELAY = 30000; // 30 ثانية كحد أقصى للتأخير
+    const MAX_RETRIES = 15; // زيادة عدد المحاولات
+    const INITIAL_RETRY_DELAY = 2000; // 2 ثانية بداية
+    const MAX_RETRY_DELAY = 30000; // 30 ثانية كحد أقصى
     let currentRetryDelay = INITIAL_RETRY_DELAY;
-    let isIntentionalPause = false;
-    let streamCheckInterval;
+    let lastDataTime = Date.now();
+    let isUserAction = false;
+    let healthCheckInterval;
+    let reconnectTimeout;
 
     // تعريف جميع عناصر DOM
     const elements = {
@@ -46,133 +48,131 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ----- وظائف إدارة البث الصوتي المحسنة ----- */
 
     function initializeAudioStream() {
-        // إلغاء أي محاولة سابقة
-        if (audioElement) {
-            audioElement.pause();
-            audioElement.remove();
-            audioElement = null;
-        }
+        // تنظيف أي موارد سابقة
+        cleanupPreviousStream();
 
-        // إنشاء عنصر الصوت الجديد
+        // إنشاء عنصر صوت جديد مع منع التخزين المؤقت
         audioElement = new Audio(`${destination}/stream?_=${Date.now()}`);
         document.body.appendChild(audioElement);
 
         // إعداد معالجات الأحداث
-        setupAudioElementEvents();
+        setupAudioEventHandlers();
 
-        // بدء التشغيل تلقائياً
-        audioElement.play().catch(error => {
-            console.error('خطأ في التشغيل التلقائي:', error);
-            handleStreamDisconnect();
-        });
-
-        // بدء مراقبة حالة البث
-        startStreamHealthCheck();
+        // بدء التشغيل التلقائي
+        startPlayback();
     }
 
-    function setupAudioElementEvents() {
-        // إزالة أي معالجات أحداث سابقة
-        audioElement.onerror = null;
-        audioElement.onended = null;
-        audioElement.onplaying = null;
-        audioElement.onpause = null;
-
-        // معالجة الأخطاء
-        audioElement.onerror = function() {
-            console.error('حدث خطأ في البث');
-            handleStreamDisconnect();
-        };
-
-        // عند انتهاء البث
-        audioElement.onended = function() {
-            console.log('انتهى البث، إعادة الاتصال...');
-            handleStreamDisconnect();
-        };
-
-        // عند بدء التشغيل بنجاح
-        audioElement.onplaying = function() {
-            console.log('البث يعمل بنجاح');
-            state.isPlaying = true;
-            retryCount = 0;
-            currentRetryDelay = INITIAL_RETRY_DELAY;
-            updatePlayButton();
-            updateStreamStatus('البث المباشر');
-        };
-
-        // عند الإيقاف
-        audioElement.onpause = function() {
-            if (!isIntentionalPause) {
-                console.log('تم إيقاف البث غير المتعمد');
-                handleStreamDisconnect();
-            }
-        };
-
-        // تحديث شريط التقدم
-        audioElement.ontimeupdate = updateProgressBar;
+    function cleanupPreviousStream() {
+        if (audioElement) {
+            audioElement.pause();
+            audioElement.src = '';
+            audioElement.removeEventListener('error', handleStreamError);
+            audioElement.removeEventListener('playing', handleStreamPlaying);
+            audioElement.removeEventListener('ended', handleStreamEnded);
+            audioElement.removeEventListener('timeupdate', handleTimeUpdate);
+            document.body.removeChild(audioElement);
+        }
+        clearTimeout(reconnectTimeout);
     }
 
-    function startStreamHealthCheck() {
-        // إيقاف أي فحص سابق
-        if (streamCheckInterval) clearInterval(streamCheckInterval);
-
-        // بدء فحص صحة البث كل 30 ثانية
-        streamCheckInterval = setInterval(() => {
-            if (audioElement && state.isPlaying) {
-                // إذا كان البث متوقفًا ولكن لم يتم إطلاق حدث الخطأ
-                if (audioElement.paused || audioElement.readyState === 0) {
-                    console.log('اكتشاف توقف البث غير المتعمد');
-                    handleStreamDisconnect();
-                }
-            }
-        }, 30000);
+    function setupAudioEventHandlers() {
+        audioElement.addEventListener('error', handleStreamError);
+        audioElement.addEventListener('playing', handleStreamPlaying);
+        audioElement.addEventListener('ended', handleStreamEnded);
+        audioElement.addEventListener('timeupdate', handleTimeUpdate);
     }
 
-    function handleStreamDisconnect() {
+    function startPlayback() {
+        audioElement.play()
+            .then(() => {
+                state.isPlaying = true;
+                lastDataTime = Date.now();
+                updatePlayButton();
+                updateStatus('البث المباشر');
+                startHealthCheck();
+            })
+            .catch(error => {
+                console.error('فشل التشغيل التلقائي:', error);
+                handleStreamError();
+            });
+    }
+
+    function handleStreamError() {
+        if (isUserAction) return;
+
+        console.error('حدث خطأ في البث');
         if (retryCount < MAX_RETRIES) {
             retryCount++;
-            console.log(`محاولة إعادة الاتصال ${retryCount} (التأخير: ${currentRetryDelay}ms)`);
+            console.log(`محاولة إعادة اتصال ${retryCount} (التأخير: ${currentRetryDelay}ms)`);
             
-            // إظهار رسالة للمستخدم
-            updateStreamStatus(`إعادة الاتصال... (المحاولة ${retryCount})`);
+            updateStatus(`جاري إعادة الاتصال... (${retryCount}/${MAX_RETRIES})`);
             
-            // إعادة المحاولة بعد تأخير (باستخدام Exponential Backoff)
-            setTimeout(() => {
-                initializeAudioStream();
+            reconnectTimeout = setTimeout(() => {
                 currentRetryDelay = Math.min(currentRetryDelay * 2, MAX_RETRY_DELAY);
+                initializeAudioStream();
             }, currentRetryDelay);
         } else {
-            console.error('تم تجاوز الحد الأقصى لمحاولات إعادة الاتصال');
-            updateStreamStatus('تعذر الاتصال بالبث. يرجى التأكد من اتصال الإنترنت');
+            console.error('تجاوز الحد الأقصى لمحاولات إعادة الاتصال');
+            updateStatus('انقطع الاتصال. يرجى المحاولة لاحقًا');
         }
     }
 
-    function updateStreamStatus(message) {
-        if (elements.currentTrack) {
-            elements.currentTrack.textContent = message;
+    function handleStreamPlaying() {
+        console.log('البث يعمل بنجاح');
+        retryCount = 0;
+        currentRetryDelay = INITIAL_RETRY_DELAY;
+        lastDataTime = Date.now();
+        updateStatus('البث المباشر');
+    }
+
+    function handleStreamEnded() {
+        console.log('انتهى البث');
+        if (!isUserAction) {
+            handleStreamError();
         }
+    }
+
+    function handleTimeUpdate() {
+        lastDataTime = Date.now();
+    }
+
+    function startHealthCheck() {
+        clearInterval(healthCheckInterval);
+        
+        healthCheckInterval = setInterval(() => {
+            if (state.isPlaying) {
+                // إذا لم يتم استلام بيانات خلال 15 ثانية
+                if (Date.now() - lastDataTime > 15000) {
+                    console.log('لم يتم استلام بيانات خلال 15 ثانية');
+                    handleStreamError();
+                }
+                
+                // إذا كان البث متوقفاً بدون سبب
+                if (audioElement.paused && !isUserAction) {
+                    console.log('اكتشاف توقف غير متوقع');
+                    handleStreamError();
+                }
+            }
+        }, 5000); // فحص كل 5 ثواني
     }
 
     function togglePlayback() {
-        if (!audioElement) return;
-
-        isIntentionalPause = !state.isPlaying;
+        isUserAction = true;
         
         if (state.isPlaying) {
             audioElement.pause();
             state.isPlaying = false;
+            clearTimeout(reconnectTimeout);
         } else {
-            audioElement.play().catch(error => {
-                console.error('خطأ في التشغيل:', error);
-                handleStreamDisconnect();
-            });
-            state.isPlaying = true;
+            startPlayback();
         }
+        
         updatePlayButton();
+        setTimeout(() => { isUserAction = false; }, 1000);
     }
 
-    /* ----- باقي الوظائف (كما هي بدون تغيير) ----- */
+    /* ----- وظائف التسجيل والمكتبة ----- */
 
-    // توليد أو استرجاع Device ID
     function initializeDeviceId() {
         let deviceId = localStorage.getItem('deviceId');
         if (!deviceId) {
@@ -183,7 +183,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return deviceId;
     }
 
-    // تحميل التسجيلات المحفوظة
     function loadRecordings() {
         initializeDeviceId();
 
@@ -193,7 +192,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 const allRecordings = JSON.parse(saved) || {};
                 state.userRecordings = allRecordings[state.deviceId] || [];
 
-                // تحويل التواريخ وتصفية المنتهية
                 const now = Date.now();
                 state.userRecordings = state.userRecordings.map(rec => ({
                     ...rec,
@@ -210,65 +208,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // حفظ التسجيلات
     function saveRecordings() {
         const allRecordings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-
         allRecordings[state.deviceId] = state.userRecordings.map(rec => ({
             ...rec,
             startTime: rec.startTime.toISOString(),
             expiry: new Date(rec.expiry).toISOString()
         }));
-
         localStorage.setItem(STORAGE_KEY, JSON.stringify(allRecordings));
-    }
-
-    function updatePlayButton() {
-        elements.playBtn.innerHTML = state.isPlaying
-            ? '<i class="fas fa-pause"></i>'
-            : '<i class="fas fa-play"></i>';
-    }
-
-    function updateProgressBar() {
-        if (!audioElement) return;
-
-        elements.currentTime.textContent = formatTime(audioElement.currentTime);
-        elements.progressBar.value = audioElement.duration
-            ? (audioElement.currentTime / audioElement.duration) * 100
-            : 0;
-        elements.duration.textContent = audioElement.duration
-            ? formatTime(audioElement.duration)
-            : '--:--';
-    }
-
-    function seekAudio() {
-        if (audioElement && audioElement.duration) {
-            audioElement.currentTime = (elements.progressBar.value / 100) * audioElement.duration;
-        }
-    }
-
-    function setupAudioControls() {
-        if (audioElement) {
-            audioElement.volume = elements.volumeSlider.value;
-        }
-
-        elements.volumeSlider.addEventListener('input', () => {
-            if (audioElement) {
-                audioElement.volume = elements.volumeSlider.value;
-            }
-        });
-
-        elements.playBtn.addEventListener('click', togglePlayback);
-        elements.progressBar.addEventListener('input', seekAudio);
-    }
-
-    function setupRecordingControls() {
-        elements.recordBtn.addEventListener('click', toggleRecording);
-        elements.downloadBtn.addEventListener('click', () => {
-            if (state.recordingSessionId) {
-                downloadRecording(state.recordingSessionId);
-            }
-        });
     }
 
     function toggleRecording() {
@@ -299,7 +246,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 state.recordingInterval = setInterval(updateRecordingTimer, 1000);
 
-                // إضافة تسجيل جديد
                 const expiryDate = new Date();
                 expiryDate.setDate(expiryDate.getDate() + RECORDING_EXPIRY_DAYS);
 
@@ -332,7 +278,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 elements.recordBtn.classList.remove('recording');
                 elements.downloadBtn.classList.remove('hidden');
 
-                // تحديث مدة التسجيل
                 const recording = state.userRecordings.find(
                     r => r.id === state.recordingSessionId
                 );
@@ -374,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (data.url) {
                     window.open(data.url, '_blank');
                 } else {
-                    alert("تعذر العثور على رابط التسجيل حاول بعد قليل اذا ضغطت مباشره بعد ايقاف التسجيل");
+                    alert("تعذر العثور على رابط التسجيل حاول بعد قليل");
                 }
             })
             .catch(error => {
@@ -384,6 +329,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function deleteRecording(sessionId) {
+        if (!confirm('هل أنت متأكد من حذف هذا التسجيل؟')) return;
+
         fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
@@ -400,19 +347,9 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    function setupLibraryControls() {
-        elements.toggleLibraryBtn.addEventListener('click', () => {
-            elements.recordingsLibrary.classList.toggle('hidden');
-            if (!elements.recordingsLibrary.classList.contains('hidden')) {
-                updateRecordingsList();
-            }
-        });
-    }
-
     function updateRecordingsList() {
         elements.recordingsList.innerHTML = '';
 
-        // تصفية التسجيلات المنتهية
         const now = Date.now();
         state.userRecordings = state.userRecordings.filter(
             r => r.expiry > now
@@ -427,7 +364,6 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        // فرز من الأحدث إلى الأقدم
         const sortedRecordings = [...state.userRecordings].sort(
             (a, b) => b.startTime - a.startTime
         );
@@ -471,6 +407,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    /* ----- وظائف المساعدة ----- */
+
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
@@ -491,22 +429,53 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    /* ----- التهيئة ----- */
+    function updateStatus(message) {
+        if (elements.currentTrack) {
+            elements.currentTrack.textContent = message;
+        }
+    }
+
+    function updatePlayButton() {
+        elements.playBtn.innerHTML = state.isPlaying
+            ? '<i class="fas fa-pause"></i>'
+            : '<i class="fas fa-play"></i>';
+    }
+
+    function setupControls() {
+        elements.playBtn.addEventListener('click', togglePlayback);
+        elements.recordBtn.addEventListener('click', toggleRecording);
+        elements.downloadBtn.addEventListener('click', () => {
+            if (state.recordingSessionId) {
+                downloadRecording(state.recordingSessionId);
+            }
+        });
+        elements.volumeSlider.addEventListener('input', () => {
+            if (audioElement) {
+                audioElement.volume = elements.volumeSlider.value;
+            }
+        });
+        elements.progressBar.addEventListener('input', seekAudio);
+        elements.toggleLibraryBtn.addEventListener('click', () => {
+            elements.recordingsLibrary.classList.toggle('hidden');
+            if (!elements.recordingsLibrary.classList.contains('hidden')) {
+                updateRecordingsList();
+            }
+        });
+    }
+
+    function seekAudio() {
+        if (audioElement && audioElement.duration) {
+            audioElement.currentTime = (elements.progressBar.value / 100) * audioElement.duration;
+        }
+    }
+
+    /* ----- التهيئة الرئيسية ----- */
 
     function init() {
-        // تهيئة السنة الحالية
         elements.currentYear.textContent = new Date().getFullYear();
-
-        // تهيئة البث الصوتي
         initializeAudioStream();
-
-        // إعداد عناصر التحكم
-        setupAudioControls();
-        setupRecordingControls();
-        setupLibraryControls();
+        setupControls();
         loadRecordings();
-
-        // تحديث عدد المستمعين كل 10 ثواني
         setInterval(updateListenerCount, 10000);
         updateListenerCount();
     }
