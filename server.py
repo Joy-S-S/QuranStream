@@ -95,7 +95,7 @@ def record_stream(device_id, session_id):
         with requests.get(STREAM_URL, stream=True) as r:
             with open(recording_file, 'wb') as f:
                 while active_recordings.get(device_id, {}).get(session_id, {}).get('active', False):
-                    chunk = next(r.iter_content(chunk_size=1024), None)
+                    chunk = r.raw.read(1024)
                     if chunk:
                         f.write(chunk)
 
