@@ -48,7 +48,10 @@ def record_stream(device_id, session_id):
                 )
                 if 'parts' not in active_recordings[device_id][session_id]:
                     active_recordings[device_id][session_id]['parts'] = []
-                active_recordings[device_id][session_id]['parts'].append(response['secure_url'])
+                active_recordings[device_id][session_id]['parts'].append({
+                    'url': response['secure_url'],
+                    'public_id': response['public_id']
+                })
                 os.remove(recording_file)
                 
     except Exception as e:
@@ -98,9 +101,20 @@ def stop_recording(device_id, session_id):
             return jsonify({
                 'message': 'تم إيقاف التسجيل',
                 'duration': duration,
-                'parts': active_recordings[device_id][session_id].get('parts', [])
+                'parts': [part['url'] for part in active_recordings[device_id][session_id].get('parts', [])]
             })
         return jsonify({'error': 'لا يوجد تسجيل نشط'}), 404
+
+@app.route('/download/<device_id>/<session_id>')
+def download_recording(device_id, session_id):
+    with recordings_lock:
+        if device_id in active_recordings and session_id in active_recordings[device_id]:
+            parts = active_recordings[device_id][session_id].get('parts', [])
+            if parts:
+                return jsonify({
+                    'urls': [part['url'] for part in parts]
+                })
+    return jsonify({'error': 'لا يوجد تسجيل'}), 404
 
 @app.route('/delete-record/<device_id>/<session_id>')
 def delete_recording(device_id, session_id):
@@ -108,9 +122,8 @@ def delete_recording(device_id, session_id):
         if device_id in active_recordings and session_id in active_recordings[device_id]:
             try:
                 if 'parts' in active_recordings[device_id][session_id]:
-                    for part_url in active_recordings[device_id][session_id]['parts']:
-                        public_id = part_url.split('/')[-1].split('.')[0]
-                        cloudinary.uploader.destroy(public_id, resource_type="video")
+                    for part in active_recordings[device_id][session_id]['parts']:
+                        cloudinary.uploader.destroy(part['public_id'], resource_type="video")
                 del active_recordings[device_id][session_id]
                 return jsonify({'message': 'تم حذف التسجيل بنجاح'})
             except Exception as e:
