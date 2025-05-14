@@ -1,34 +1,40 @@
-from flask import Flask, send_from_directory, jsonify
+rom flask import Flask, Response, jsonify
+import requests
 import os
 from datetime import datetime, timedelta
-import threading
 import uuid
 import cloudinary
 import cloudinary.uploader
-from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Lock
-import requests
 
 app = Flask(__name__)
 
-# إعدادات Cloudinary
+# Cloudinary Config
 cloudinary.config(
     cloud_name=os.getenv('CLOUD_NAME'),
     api_key=os.getenv('API_KEY'),
     api_secret=os.getenv('API_SECRET')
 )
 
-# إعدادات البث المباشر
 STREAM_URL = "https://stream.radiojar.com/8s5u5tpdtwzuv"
-RECORDINGS_DIR = "temp_recordings"
-
-# تخزين جلسات التسجيل
-active_recordings = {}
-recordings_lock = Lock()
+active_streams = {}
+stream_lock = Lock()
 
 # إنشاء مجدول المهام
 scheduler = BackgroundScheduler()
 scheduler.start()
+
+@app.route('/stream')
+def stream_proxy():
+    def generate():
+        try:
+            with requests.get(STREAM_URL, stream=True, timeout=30) as r:
+                for chunk in r.iter_content(chunk_size=1024):
+                    yield chunk
+        except Exception as e:
+            print(f"Stream error: {e}")
+
+    return Response(generate(), mimetype="audio/mpeg")
 
 def cleanup_expired_recordings():
     """حذف التسجيلات القديمة من الذاكرة"""
