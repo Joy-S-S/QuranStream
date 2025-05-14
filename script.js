@@ -1,16 +1,11 @@
 document.addEventListener('DOMContentLoaded', function () {
+    const STREAM_URL = "https://stream.radiojar.com/8s5u5tpdtwzuv";
     const destination = "https://quranliveradio.up.railway.app";
     let audioElement;
     let retryCount = 0;
-    const MAX_RETRIES = 10;
+    const MAX_RETRIES = 15;
     const RETRY_DELAY = 3000;
-    let currentRetryDelay = INITIAL_RETRY_DELAY;
-    let lastDataTime = Date.now();
-    let isUserAction = false;
-    let healthCheckInterval;
-    let reconnectTimeout;
 
-    // تعريف جميع عناصر DOM
     const elements = {
         playBtn: document.getElementById('playBtn'),
         recordBtn: document.getElementById('recordBtn'),
@@ -29,7 +24,6 @@ document.addEventListener('DOMContentLoaded', function () {
         currentTrack: document.getElementById('current-track')
     };
 
-    // حالة التطبيق
     const state = {
         isPlaying: false,
         isRecording: false,
@@ -40,16 +34,13 @@ document.addEventListener('DOMContentLoaded', function () {
         userRecordings: []
     };
 
-    // الثوابت
     const STORAGE_KEY = 'quranRadioRecordings';
     const RECORDING_EXPIRY_DAYS = 1;
-
-    /* ----- وظائف إدارة البث الصوتي المحسنة ----- */
 
     function initializeAudioStream() {
         cleanupPreviousStream();
         
-        audioElement = new Audio(`${destination}/stream?nocache=${Date.now()}`);
+        audioElement = new Audio(`${STREAM_URL}?_=${Date.now()}`);
         document.body.appendChild(audioElement);
         
         audioElement.addEventListener('error', handleStreamError);
@@ -70,13 +61,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function setupAudioEventHandlers() {
-        audioElement.addEventListener('error', handleStreamError);
-        audioElement.addEventListener('playing', handleStreamPlaying);
-        audioElement.addEventListener('ended', handleStreamEnded);
-        audioElement.addEventListener('timeupdate', handleTimeUpdate);
-    }
-
     function startPlayback() {
         audioElement.play()
             .then(() => {
@@ -94,69 +78,33 @@ document.addEventListener('DOMContentLoaded', function () {
     function handleStreamError() {
         if (retryCount < MAX_RETRIES) {
             retryCount++;
-            console.log(`محاولة إعادة اتصال ${retryCount}/${MAX_RETRIES}`);
-            
             updateStatus(`جاري إعادة الاتصال... (${retryCount}/${MAX_RETRIES})`);
             
             setTimeout(() => {
                 initializeAudioStream();
             }, RETRY_DELAY);
         } else {
-            console.error('تجاوز الحد الأقصى لمحاولات إعادة الاتصال');
             updateStatus('انقطع الاتصال. يرجى المحاولة لاحقًا');
         }
     }
 
     function handleStreamPlaying() {
-        console.log('البث يعمل بنجاح');
         updateStatus('البث المباشر');
     }
 
-     function handleStreamEnded() {
-        console.log('انتهى البث');
+    function handleStreamEnded() {
         handleStreamError();
     }
 
-    function handleTimeUpdate() {
-        lastDataTime = Date.now();
-    }
-
-    function startHealthCheck() {
-        clearInterval(healthCheckInterval);
-        
-        healthCheckInterval = setInterval(() => {
-            if (state.isPlaying) {
-                // إذا لم يتم استلام بيانات خلال 15 ثانية
-                if (Date.now() - lastDataTime > 15000) {
-                    console.log('لم يتم استلام بيانات خلال 15 ثانية');
-                    handleStreamError();
-                }
-                
-                // إذا كان البث متوقفاً بدون سبب
-                if (audioElement.paused && !isUserAction) {
-                    console.log('اكتشاف توقف غير متوقع');
-                    handleStreamError();
-                }
-            }
-        }, 5000); // فحص كل 5 ثواني
-    }
-
     function togglePlayback() {
-        isUserAction = true;
-        
         if (state.isPlaying) {
             audioElement.pause();
             state.isPlaying = false;
-            clearTimeout(reconnectTimeout);
         } else {
             startPlayback();
         }
-        
         updatePlayButton();
-        setTimeout(() => { isUserAction = false; }, 1000);
     }
-
-    /* ----- وظائف التسجيل والمكتبة ----- */
 
     function initializeDeviceId() {
         let deviceId = localStorage.getItem('deviceId');
@@ -165,63 +113,33 @@ document.addEventListener('DOMContentLoaded', function () {
             localStorage.setItem('deviceId', deviceId);
         }
         state.deviceId = deviceId;
-        return deviceId;
     }
 
     function loadRecordings() {
         initializeDeviceId();
-
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             try {
                 const allRecordings = JSON.parse(saved) || {};
                 state.userRecordings = allRecordings[state.deviceId] || [];
-
-                const now = Date.now();
-                state.userRecordings = state.userRecordings.map(rec => ({
-                    ...rec,
-                    startTime: new Date(rec.startTime),
-                    expiry: new Date(rec.expiry).getTime()
-                })).filter(rec => rec.expiry > now);
-
-                saveRecordings();
                 updateRecordingsList();
             } catch (error) {
                 console.error('فشل تحميل التسجيلات:', error);
-                state.userRecordings = [];
             }
         }
     }
 
     function saveRecordings() {
         const allRecordings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-        allRecordings[state.deviceId] = state.userRecordings.map(rec => ({
-            ...rec,
-            startTime: rec.startTime.toISOString(),
-            expiry: new Date(rec.expiry).toISOString()
-        }));
+        allRecordings[state.deviceId] = state.userRecordings;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(allRecordings));
-    }
-
-    function toggleRecording() {
-        if (state.isRecording) {
-            stopRecording();
-        } else {
-            if (elements.recordingsLibrary.classList.contains('hidden')) {
-                elements.recordingsLibrary.classList.remove('hidden');
-            }
-            startRecording();
-        }
     }
 
     function startRecording() {
         fetch(`${destination}/start-record/${state.deviceId}`)
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.text();
-            })
-            .then(sessionId => {
-                state.recordingSessionId = sessionId;
+            .then(response => response.json())
+            .then(data => {
+                state.recordingSessionId = data.session_id;
                 state.isRecording = true;
                 state.recordingStartTime = Date.now();
 
@@ -229,24 +147,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 elements.recordingInfo.classList.remove('hidden');
                 elements.downloadBtn.classList.add('hidden');
 
-                state.recordingInterval = setInterval(updateRecordingTimer, 1000);
-
-                const expiryDate = new Date();
-                expiryDate.setDate(expiryDate.getDate() + RECORDING_EXPIRY_DAYS);
-
-                state.userRecordings.push({
-                    id: sessionId,
-                    startTime: new Date(),
-                    duration: 0,
-                    expiry: expiryDate.getTime()
-                });
-
-                saveRecordings();
-                updateRecordingsList();
+                state.recordingInterval = setInterval(() => {
+                    const seconds = Math.floor((Date.now() - state.recordingStartTime) / 1000);
+                    elements.recordingTime.textContent = formatTime(seconds);
+                }, 1000);
             })
             .catch(error => {
                 console.error('فشل بدء التسجيل:', error);
-                alert('تعذر بدء التسجيل. يرجى المحاولة مرة أخرى');
+                alert('تعذر بدء التسجيل');
             });
     }
 
@@ -254,62 +162,30 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!state.recordingSessionId) return;
 
         fetch(`${destination}/stop-record/${state.deviceId}/${state.recordingSessionId}`)
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-
+            .then(response => response.json())
+            .then(data => {
                 clearInterval(state.recordingInterval);
                 state.isRecording = false;
-
                 elements.recordBtn.classList.remove('recording');
                 elements.downloadBtn.classList.remove('hidden');
 
-                const recording = state.userRecordings.find(
-                    r => r.id === state.recordingSessionId
-                );
-
-                if (recording) {
-                    recording.duration = Math.floor(
-                        (Date.now() - state.recordingStartTime) / 1000
-                    );
-                    saveRecordings();
-                }
+                const expiryDate = new Date();
+                expiryDate.setDate(expiryDate.getDate() + RECORDING_EXPIRY_DAYS);
+                
+                state.userRecordings.push({
+                    id: state.recordingSessionId,
+                    startTime: new Date(state.recordingStartTime),
+                    duration: data.duration,
+                    expiry: expiryDate.getTime(),
+                    parts: data.parts
+                });
+                
+                saveRecordings();
+                updateRecordingsList();
             })
             .catch(error => {
                 console.error('فشل إيقاف التسجيل:', error);
-                alert('تعذر إيقاف التسجيل. يرجى المحاولة مرة أخرى');
-            });
-    }
-
-    function updateRecordingTimer() {
-        const seconds = Math.floor((Date.now() - state.recordingStartTime) / 1000);
-        elements.recordingTime.textContent = formatTime(seconds);
-
-        const recording = state.userRecordings.find(
-            r => r.id === state.recordingSessionId
-        );
-
-        if (recording) {
-            recording.duration = seconds;
-            saveRecordings();
-        }
-    }
-
-    function downloadRecording(sessionId) {
-        fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
-            .then(response => {
-                if (!response.ok) throw new Error("Network response was not ok");
-                return response.json();
-            })
-            .then(data => {
-                if (data.url) {
-                    window.open(data.url, '_blank');
-                } else {
-                    alert("تعذر العثور على رابط التسجيل حاول بعد قليل");
-                }
-            })
-            .catch(error => {
-                console.error('فشل تحميل التسجيل:', error);
-                alert('تعذر تحميل التسجيل: ' + error.message);
+                alert('تعذر إيقاف التسجيل');
             });
     }
 
@@ -317,18 +193,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!confirm('هل أنت متأكد من حذف هذا التسجيل؟')) return;
 
         fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-
-                state.userRecordings = state.userRecordings.filter(
-                    r => r.id !== sessionId
-                );
+            .then(response => response.json())
+            .then(data => {
+                state.userRecordings = state.userRecordings.filter(r => r.id !== sessionId);
                 saveRecordings();
                 updateRecordingsList();
             })
             .catch(error => {
                 console.error('فشل حذف التسجيل:', error);
-                alert('تعذر حذف التسجيل. يرجى التأكد من ايقاف التسجيل');
+                alert('تعذر حذف التسجيل');
             });
     }
 
@@ -336,24 +209,16 @@ document.addEventListener('DOMContentLoaded', function () {
         elements.recordingsList.innerHTML = '';
 
         const now = Date.now();
-        state.userRecordings = state.userRecordings.filter(
-            r => r.expiry > now
-        );
+        state.userRecordings = state.userRecordings.filter(r => r.expiry > now);
         saveRecordings();
 
         if (state.userRecordings.length === 0) {
             elements.recordingsList.innerHTML = 
-                `<p style="text-align: center; color: #7f8c8d;">
-                    لا توجد تسجيلات متاحة
-                </p>`;
+                `<p style="text-align: center; color: #7f8c8d;">لا توجد تسجيلات متاحة</p>`;
             return;
         }
 
-        const sortedRecordings = [...state.userRecordings].sort(
-            (a, b) => b.startTime - a.startTime
-        );
-
-        sortedRecordings.forEach(rec => {
+        state.userRecordings.sort((a, b) => b.startTime - a.startTime).forEach(rec => {
             const item = document.createElement('div');
             item.className = 'recording-item';
 
@@ -372,46 +237,34 @@ document.addEventListener('DOMContentLoaded', function () {
                     </span>
                 </div>
                 <div class="recording-item-actions">
-                    <button class="recording-item-btn download-item" title="تحميل">
-                        <i class="fas fa-download"></i>
-                    </button>
+                    ${rec.parts.map((part, i) => 
+                        `<button class="recording-item-btn download-item" data-url="${part}">
+                            <i class="fas fa-download"></i> الجزء ${i+1}
+                        </button>`
+                    ).join('')}
                     <button class="recording-item-btn delete" title="حذف">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>`;
 
-            item.querySelector('.delete').addEventListener('click', () => {
-                deleteRecording(rec.id);
+            item.querySelectorAll('.download-item').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    window.open(btn.dataset.url, '_blank');
+                });
             });
 
-            item.querySelector('.download-item').addEventListener('click', () => {
-                downloadRecording(rec.id);
+            item.querySelector('.delete').addEventListener('click', () => {
+                deleteRecording(rec.id);
             });
 
             elements.recordingsList.appendChild(item);
         });
     }
 
-    /* ----- وظائف المساعدة ----- */
-
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-
-    function updateListenerCount() {
-        fetch(`${destination}/listener-count`)
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.text();
-            })
-            .then(count => {
-                elements.listenerCount.textContent = count;
-            })
-            .catch(error => {
-                console.error('فشل تحديث عدد المستمعين:', error);
-            });
     }
 
     function updateStatus(message) {
@@ -428,18 +281,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function setupControls() {
         elements.playBtn.addEventListener('click', togglePlayback);
-        elements.recordBtn.addEventListener('click', toggleRecording);
+        elements.recordBtn.addEventListener('click', () => {
+            if (state.isRecording) stopRecording();
+            else startRecording();
+        });
         elements.downloadBtn.addEventListener('click', () => {
             if (state.recordingSessionId) {
-                downloadRecording(state.recordingSessionId);
+                const recording = state.userRecordings.find(r => r.id === state.recordingSessionId);
+                if (recording && recording.parts) {
+                    recording.parts.forEach(part => window.open(part, '_blank'));
+                }
             }
         });
         elements.volumeSlider.addEventListener('input', () => {
-            if (audioElement) {
-                audioElement.volume = elements.volumeSlider.value;
-            }
+            if (audioElement) audioElement.volume = elements.volumeSlider.value;
         });
-        elements.progressBar.addEventListener('input', seekAudio);
         elements.toggleLibraryBtn.addEventListener('click', () => {
             elements.recordingsLibrary.classList.toggle('hidden');
             if (!elements.recordingsLibrary.classList.contains('hidden')) {
@@ -448,21 +304,11 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function seekAudio() {
-        if (audioElement && audioElement.duration) {
-            audioElement.currentTime = (elements.progressBar.value / 100) * audioElement.duration;
-        }
-    }
-
-    /* ----- التهيئة الرئيسية ----- */
-
     function init() {
         elements.currentYear.textContent = new Date().getFullYear();
         initializeAudioStream();
         setupControls();
         loadRecordings();
-        setInterval(updateListenerCount, 10000);
-        updateListenerCount();
     }
 
     init();
