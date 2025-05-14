@@ -12,7 +12,7 @@ from threading import Lock
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'secret!')
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # إعدادات Cloudinary
 cloudinary.config(
