@@ -1,3 +1,5 @@
+from gevent import monkey
+monkey.patch_all()
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 import requests
@@ -9,8 +11,6 @@ import cloudinary
 import cloudinary.uploader
 from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Lock
-from gevent import monkey
-monkey.patch_all()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'secret!')
