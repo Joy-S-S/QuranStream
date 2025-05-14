@@ -345,7 +345,74 @@ footer .container {
     color: #e74c3c;
     margin-top: 3px;
 }
+/* هيكل التطبيق الجديد */
+.app-container {
+  display: flex;
+  flex-direction: row-reverse; /* لأن التطبيق RTL */
+  min-height: calc(100vh - 120px);
+}
 
+/* Sidebar أنماط */
+.sidebar {
+  width: 280px;
+  background-color: #fff;
+  padding: 20px;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+  margin-left: 20px;
+}
+
+.sidebar h3 {
+  color: #2c3e50;
+  margin-bottom: 15px;
+  text-align: center;
+  font-size: 1.2rem;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.date-display {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.gregorian-date, .hijri-date {
+  margin: 10px 0;
+  font-size: 1.1rem;
+}
+
+.hijri-date {
+  color: #8e44ad;
+  font-weight: bold;
+}
+
+/* مواقيت الصلاة */
+.prayer-times {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prayer-time {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+}
+
+.prayer-name {
+  font-weight: bold;
+}
+
+.prayer-time .time {
+  color: #3498db;
+}
+
+.loader {
+  text-align: center;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
 
 @media (max-width: 768px) {
     header p {
@@ -355,6 +422,16 @@ footer .container {
     .player-info h2 {
         font-size: 1.2rem;
     }
+    .app-container {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    margin-left: 0;
+    margin-bottom: 20px;
+    order: -1;
+  }
 }
 
 @media (max-width: 480px) {
