@@ -18,6 +18,8 @@ cloudinary.config(
     api_secret=os.getenv('API_SECRET')
 )
 
+print("Cloudinary config:", os.getenv('CLOUD_NAME'), os.getenv('API_KEY'), os.getenv('API_SECRET'))
+
 # إعدادات البث المباشر
 STREAM_URL = "https://stream.radiojar.com/8s5u5tpdtwzuv"
 RECORDINGS_DIR = "temp_recordings"  # مجلد مؤقت لحفظ التسجيلات قبل الرفع
