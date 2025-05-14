@@ -5,15 +5,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let retryCount = 0;
     const MAX_RETRIES = 15;
     const RETRY_DELAY = 3000;
-    const socket = io('https://your-railway-url.up.railway.app');
-
-    socket.on('connect', () => {
-        console.log('Connected to WebSocket');
-    });
-
-    socket.on('listeners_count', (data) => {
-        document.getElementById('listenerCount').textContent = data.count;
-    });
 
     const elements = {
         playBtn: document.getElementById('playBtn'),
@@ -29,7 +20,6 @@ document.addEventListener('DOMContentLoaded', function () {
         recordingsLibrary: document.querySelector('.recordings-library'),
         recordingsList: document.getElementById('recordingsList'),
         toggleLibraryBtn: document.getElementById('toggleLibraryBtn'),
-        listenerCount: document.getElementById('listenerCount'),
         currentTrack: document.getElementById('current-track')
     };
 
