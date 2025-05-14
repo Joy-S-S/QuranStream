@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const destination = "https://quranliveradio.up.railway.app";
-    const audioElement = new Audio(`${destination}/stream`);
+    const streamUrl = "https://stream.radiojar.com/8s5u5tpdtwzuv";
+    const audioElement = new Audio(streamUrl);
     document.body.appendChild(audioElement);
 
     // تعريف جميع عناصر DOM
@@ -18,7 +19,6 @@ document.addEventListener('DOMContentLoaded', function () {
         recordingsLibrary: document.querySelector('.recordings-library'),
         recordingsList: document.getElementById('recordingsList'),
         toggleLibraryBtn: document.getElementById('toggleLibraryBtn'),
-        listenerCount: document.getElementById('listenerCount')
     };
 
     // حالة التطبيق
@@ -41,7 +41,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* ----- الوظائف الأساسية ----- */
 
-    // توليد أو استرجاع Device ID
     function initializeDeviceId() {
         let deviceId = localStorage.getItem('deviceId');
         if (!deviceId) {
@@ -52,7 +51,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return deviceId;
     }
 
-    // تحميل التسجيلات المحفوظة
     function loadRecordings() {
         initializeDeviceId();
 
@@ -79,16 +77,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // حفظ التسجيلات
     function saveRecordings() {
         const allRecordings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-
         allRecordings[state.deviceId] = state.userRecordings.map(rec => ({
             ...rec,
             startTime: rec.startTime.toISOString(),
             expiry: new Date(rec.expiry).toISOString()
         }));
-
         localStorage.setItem(STORAGE_KEY, JSON.stringify(allRecordings));
     }
 
@@ -156,7 +151,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (state.isRecording) {
             stopRecording();
         } else {
-            // إظهار المكتبة إذا كانت مخفية
             if (elements.recordingsLibrary.classList.contains('hidden')) {
                 elements.recordingsLibrary.classList.remove('hidden');
             }
@@ -189,7 +183,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     id: sessionId,
                     startTime: new Date(),
                     duration: 0,
-                    expiry: expiryDate.getTime()
+                    expiry: expiryDate.getTime(),
+                    segments: []
                 });
 
                 saveRecordings();
@@ -247,25 +242,30 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function downloadRecording(sessionId) {
-    fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
-        .then(response => {
-            if (!response.ok) throw new Error("Network response was not ok");
-            return response.json();
-        })
-        .then(data => {
-            if (data.url) {
-                window.open(data.url, '_blank');  // يفتح الرابط في نافذة جديدة
-            } else {
-                alert("تعذر العثور على رابط التسجيل حاول بعد قليل اذا ضغطت مباشره بعد ايقاف التسجيل");
-            }
-        })
-        .catch(error => {
-            console.error('فشل تحميل التسجيل:', error);
-            alert('تعذر تحميل التسجيل: ' + error.message);
-        });
-}
+        fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.json();
+            })
+            .then(data => {
+                if (data.urls && data.urls.length > 0) {
+                    // فتح جميع الأجزاء في نوافذ جديدة
+                    data.urls.forEach(url => {
+                        window.open(url, '_blank');
+                    });
+                } else {
+                    alert("تعذر العثور على رابط التسجيل حاول بعد قليل اذا ضغطت مباشره بعد ايقاف التسجيل");
+                }
+            })
+            .catch(error => {
+                console.error('فشل تحميل التسجيل:', error);
+                alert('تعذر تحميل التسجيل: ' + error.message);
+            });
+    }
 
     function deleteRecording(sessionId) {
+        if (!confirm('هل أنت متأكد من حذف هذا التسجيل؟')) return;
+        
         fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .catch(error => {
                 console.error('فشل حذف التسجيل:', error);
-                alert('تعذر حذف التسجيل. يرجى التأكد من ايقاف التسجيل  ');
+                alert('تعذر حذف التسجيل. يرجى التأكد من ايقاف التسجيل');
             });
     }
 
@@ -305,10 +305,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (state.userRecordings.length === 0) {
             elements.recordingsList.innerHTML = 
-                <p style="text-align: center; color: #7f8c8d;">
-                    لا توجد تسجيلات متاحة
-                </p>
-            ;
+                '<p style="text-align: center; color: #7f8c8d;">لا توجد تسجيلات متاحة</p>';
             return;
         }
 
@@ -342,8 +339,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <button class="recording-item-btn delete" title="حذف">
                         <i class="fas fa-trash"></i>
                     </button>
-                </div>`
-            ;
+                </div>`;
 
             item.querySelector('.delete').addEventListener('click', () => {
                 deleteRecording(rec.id);
@@ -365,20 +361,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 
-    function updateListenerCount() {
-        fetch(`${destination}/listener-count`)
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.text();
-            })
-            .then(count => {
-                elements.listenerCount.textContent = count;
-            })
-            .catch(error => {
-                console.error('فشل تحديث عدد المستمعين:', error);
-            });
-    }
-
     /* ----- التهيئة ----- */
 
     function init() {
@@ -386,10 +368,6 @@ document.addEventListener('DOMContentLoaded', function () {
         setupRecordingControls();
         setupLibraryControls();
         loadRecordings();
-
-        // تحديث عدد المستمعين كل 10 ثواني
-        setInterval(updateListenerCount, 10000);
-        updateListenerCount();
 
         // تهيئة حالة زر التشغيل
         audioElement.addEventListener('loadedmetadata', () => {
