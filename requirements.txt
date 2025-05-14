@@ -2,8 +2,5 @@ Flask==3.0.2
 requests==2.31.0
 cloudinary==1.38.0
 APScheduler==3.10.4
-gunicorn
-httpx
-flask-socketio==5.3.6
-eventlet==0.33.3
-setuptools==68.2.2
+gunicorn==21.2.0
+python-dotenv==1.0.0
