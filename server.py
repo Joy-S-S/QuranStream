@@ -8,8 +8,12 @@ import cloudinary
 import cloudinary.uploader
 from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Lock
+from werkzeug.serving import WSGIRequestHandler
 
 app = Flask(__name__)
+
+# إجبار استخدام HTTP/1.1
+WSGIRequestHandler.protocol_version = "HTTP/1.1"
 
 # إعدادات Cloudinary
 cloudinary.config(
@@ -20,7 +24,7 @@ cloudinary.config(
 
 # إعدادات البث المباشر
 STREAM_URL = "https://stream.radiojar.com/8s5u5tpdtwzuv"
-RECORDINGS_DIR = "temp_recordings"  # مجلد مؤقت لحفظ التسجيلات قبل الرفع
+RECORDINGS_DIR = "temp_recordings"
 
 # تخزين جلسات التسجيل
 active_recordings = {}  # {device_id: {session_id: {'active': bool, 'file': str, 'thread': threading.Thread, 'expiry': datetime}}}
@@ -70,16 +74,34 @@ def proxy_stream():
             print(f"مستمع جديد متصل. الإجمالي: {listener_count}")
         
         try:
-            with requests.get(STREAM_URL, stream=True) as r:
+            headers = {
+                'User-Agent': 'Mozilla/5.0',
+                'Accept': '*/*',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive'
+            }
+            
+            with requests.get(STREAM_URL, stream=True, headers=headers, timeout=30) as r:
+                r.raise_for_status()
                 for chunk in r.iter_content(chunk_size=1024):
                     if chunk:
                         yield chunk
+        except requests.exceptions.RequestException as e:
+            print(f"خطأ في البث: {e}")
         finally:
             with listener_lock:
                 listener_count -= 1
                 print(f"انقطع اتصال المستمع. الإجمالي: {listener_count}")
     
-    return Response(generate(), content_type='audio/mpeg')
+    response_headers = {
+        'Content-Type': 'audio/mpeg',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Connection': 'keep-alive'
+    }
+    
+    return Response(generate(), headers=response_headers)
 
 @app.route('/listener-count')
 def get_listener_count():
