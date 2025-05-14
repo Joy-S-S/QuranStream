@@ -3,3 +3,4 @@ requests==2.31.0
 cloudinary==1.38.0
 APScheduler==3.10.4
 gunicorn
+httpx
