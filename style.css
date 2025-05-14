@@ -120,18 +120,6 @@ main {
     gap: 15px;
 }
 
-.listener-counter {
-    margin-top: 15px;
-    font-size: 0.9rem;
-    color: #7f8c8d;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.listener-counter i {
-    color: #3498db;
-}
 
 .recordings-library {
     background-color: #fff;
