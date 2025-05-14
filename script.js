@@ -1,7 +1,9 @@
 document.addEventListener('DOMContentLoaded', function () {
     const destination = "https://quranliveradio.up.railway.app";
-    const audioElement = new Audio(`${destination}/stream`);
-    document.body.appendChild(audioElement);
+    let audioElement;
+    let retryCount = 0;
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY = 5000; // 5 ثواني بين المحاولات
 
     // تعريف جميع عناصر DOM
     const elements = {
@@ -36,8 +38,84 @@ document.addEventListener('DOMContentLoaded', function () {
     const STORAGE_KEY = 'quranRadioRecordings';
     const RECORDING_EXPIRY_DAYS = 1;
 
-    // تهيئة السنة الحالية
-    elements.currentYear.textContent = new Date().getFullYear();
+    /* ----- وظائف إدارة البث الصوتي ----- */
+
+    function initializeAudioStream() {
+        // إنشاء عنصر الصوت الجديد
+        audioElement = new Audio(`${destination}/stream`);
+        document.body.appendChild(audioElement);
+
+        // إعداد معالجات الأحداث
+        setupAudioElementEvents();
+
+        // بدء التشغيل تلقائياً
+        audioElement.play().catch(error => {
+            console.error('خطأ في التشغيل التلقائي:', error);
+        });
+    }
+
+    function setupAudioElementEvents() {
+        // إزالة أي معالجات أحداث سابقة
+        audioElement.onerror = null;
+        audioElement.onended = null;
+        audioElement.onplaying = null;
+
+        // معالجة الأخطاء
+        audioElement.onerror = function() {
+            console.error('حدث خطأ في البث');
+            handleStreamDisconnect();
+        };
+
+        // عند انتهاء البث
+        audioElement.onended = function() {
+            console.log('انتهى البث، إعادة الاتصال...');
+            handleStreamDisconnect();
+        };
+
+        // عند بدء التشغيل بنجاح
+        audioElement.onplaying = function() {
+            console.log('البث يعمل بنجاح');
+            state.isPlaying = true;
+            retryCount = 0; // إعادة تعيين عداد المحاولات
+            updatePlayButton();
+        };
+
+        // تحديث شريط التقدم
+        audioElement.ontimeupdate = updateProgressBar;
+    }
+
+    function handleStreamDisconnect() {
+        if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            console.log(`محاولة إعادة الاتصال ${retryCount}/${MAX_RETRIES}`);
+            
+            // إظهار رسالة للمستخدم
+            showReconnectMessage(retryCount);
+            
+            // إعادة المحاولة بعد تأخير
+            setTimeout(initializeAudioStream, RETRY_DELAY);
+        } else {
+            console.error('تم تجاوز الحد الأقصى لمحاولات إعادة الاتصال');
+            showMaxRetriesMessage();
+        }
+    }
+
+    function showReconnectMessage(count) {
+        const currentTrack = document.getElementById('current-track');
+        const originalText = currentTrack.textContent;
+        currentTrack.textContent = `محاولة إعادة الاتصال (${count}/${MAX_RETRIES})...`;
+        
+        setTimeout(() => {
+            currentTrack.textContent = originalText;
+        }, RETRY_DELAY - 1000);
+    }
+
+    function showMaxRetriesMessage() {
+        const currentTrack = document.getElementById('current-track');
+        currentTrack.textContent = 'تعذر الاتصال بالبث. يرجى تحديث الصفحة';
+        state.isPlaying = false;
+        updatePlayButton();
+    }
 
     /* ----- الوظائف الأساسية ----- */
 
@@ -95,27 +173,32 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ----- التحكم في الصوت ----- */
 
     function setupAudioControls() {
-        audioElement.volume = elements.volumeSlider.value;
+        if (audioElement) {
+            audioElement.volume = elements.volumeSlider.value;
+        }
 
         elements.volumeSlider.addEventListener('input', () => {
-            audioElement.volume = elements.volumeSlider.value;
+            if (audioElement) {
+                audioElement.volume = elements.volumeSlider.value;
+            }
         });
 
         elements.playBtn.addEventListener('click', togglePlayback);
-
-        audioElement.addEventListener('timeupdate', updateProgressBar);
         elements.progressBar.addEventListener('input', seekAudio);
     }
 
     function togglePlayback() {
+        if (!audioElement) return;
+
         if (state.isPlaying) {
             audioElement.pause();
+            state.isPlaying = false;
         } else {
             audioElement.play().catch(error => {
                 console.error('خطأ في التشغيل:', error);
             });
+            state.isPlaying = true;
         }
-        state.isPlaying = !state.isPlaying;
         updatePlayButton();
     }
 
@@ -126,6 +209,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateProgressBar() {
+        if (!audioElement) return;
+
         elements.currentTime.textContent = formatTime(audioElement.currentTime);
         elements.progressBar.value = audioElement.duration
             ? (audioElement.currentTime / audioElement.duration) * 100
@@ -136,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function seekAudio() {
-        if (audioElement.duration) {
+        if (audioElement && audioElement.duration) {
             audioElement.currentTime = (elements.progressBar.value / 100) * audioElement.duration;
         }
     }
@@ -156,7 +241,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (state.isRecording) {
             stopRecording();
         } else {
-            // إظهار المكتبة إذا كانت مخفية
             if (elements.recordingsLibrary.classList.contains('hidden')) {
                 elements.recordingsLibrary.classList.remove('hidden');
             }
@@ -247,23 +331,23 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function downloadRecording(sessionId) {
-    fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
-        .then(response => {
-            if (!response.ok) throw new Error("Network response was not ok");
-            return response.json();
-        })
-        .then(data => {
-            if (data.url) {
-                window.open(data.url, '_blank');  // يفتح الرابط في نافذة جديدة
-            } else {
-                alert("تعذر العثور على رابط التسجيل حاول بعد قليل اذا ضغطت مباشره بعد ايقاف التسجيل");
-            }
-        })
-        .catch(error => {
-            console.error('فشل تحميل التسجيل:', error);
-            alert('تعذر تحميل التسجيل: ' + error.message);
-        });
-}
+        fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.json();
+            })
+            .then(data => {
+                if (data.url) {
+                    window.open(data.url, '_blank');
+                } else {
+                    alert("تعذر العثور على رابط التسجيل حاول بعد قليل اذا ضغطت مباشره بعد ايقاف التسجيل");
+                }
+            })
+            .catch(error => {
+                console.error('فشل تحميل التسجيل:', error);
+                alert('تعذر تحميل التسجيل: ' + error.message);
+            });
+    }
 
     function deleteRecording(sessionId) {
         fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
@@ -278,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .catch(error => {
                 console.error('فشل حذف التسجيل:', error);
-                alert('تعذر حذف التسجيل. يرجى التأكد من ايقاف التسجيل  ');
+                alert('تعذر حذف التسجيل. يرجى التأكد من ايقاف التسجيل');
             });
     }
 
@@ -305,10 +389,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (state.userRecordings.length === 0) {
             elements.recordingsList.innerHTML = 
-                <p style="text-align: center; color: #7f8c8d;">
+                `<p style="text-align: center; color: #7f8c8d;">
                     لا توجد تسجيلات متاحة
-                </p>
-            ;
+                </p>`;
             return;
         }
 
@@ -342,8 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <button class="recording-item-btn delete" title="حذف">
                         <i class="fas fa-trash"></i>
                     </button>
-                </div>`
-            ;
+                </div>`;
 
             item.querySelector('.delete').addEventListener('click', () => {
                 deleteRecording(rec.id);
@@ -382,6 +464,13 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ----- التهيئة ----- */
 
     function init() {
+        // تهيئة السنة الحالية
+        elements.currentYear.textContent = new Date().getFullYear();
+
+        // تهيئة البث الصوتي
+        initializeAudioStream();
+
+        // إعداد عناصر التحكم
         setupAudioControls();
         setupRecordingControls();
         setupLibraryControls();
@@ -390,12 +479,6 @@ document.addEventListener('DOMContentLoaded', function () {
         // تحديث عدد المستمعين كل 10 ثواني
         setInterval(updateListenerCount, 10000);
         updateListenerCount();
-
-        // تهيئة حالة زر التشغيل
-        audioElement.addEventListener('loadedmetadata', () => {
-            state.isPlaying = !audioElement.paused;
-            updatePlayButton();
-        });
     }
 
     init();
