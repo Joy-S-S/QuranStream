@@ -135,91 +135,29 @@ def stop_recording(device_id, session_id):
 
 @app.route('/upload-chunks/<device_id>/<session_id>')
 def upload_chunks(device_id, session_id):
-    """رفع الأجزاء إلى Cloudinary مع تحسينات في التعامل مع الأخطاء"""
+    """رفع الأجزاء إلى Cloudinary"""
     with recordings_lock:
-        try:
-            # التحقق من وجود التسجيل
-            if device_id not in active_recordings or session_id not in active_recordings[device_id]:
-                return jsonify({
-                    "status": "error",
-                    "message": "لا يوجد تسجيل نشط"
-                }), 404
-
-            # التحقق من وجود ملفات للرفع
-            if not active_recordings[device_id][session_id].get('files'):
-                return jsonify({
-                    "status": "error",
-                    "message": "لا توجد أجزاء متاحة للرفع"
-                }), 400
-
-            uploaded_urls = []
-            failed_uploads = []
-            
-            for file_path in active_recordings[device_id][session_id]['files']:
-                if not os.path.exists(file_path):
-                    print(f"الملف غير موجود: {file_path}")
-                    failed_uploads.append(file_path)
-                    continue
-
+        if device_id not in active_recordings or session_id not in active_recordings[device_id]:
+            return jsonify({"error": "لا يوجد تسجيل"}), 404
+        
+        uploaded_urls = []
+        for file_path in active_recordings[device_id][session_id]['files']:
+            if os.path.exists(file_path):
                 try:
-                    # إنشاء معرف فريد لكل جزء مع الحفاظ على ترتيب الأجزاء
-                    chunk_index = len(uploaded_urls) + len(failed_uploads)
-                    public_id = f"quran_radio/{device_id}/{session_id}/part_{chunk_index + 1}"
-                    
-                    # رفع الملف مع إعدادات تحسين
+                    public_id = f"quran_radio/{device_id}/recording_{session_id}_{os.path.basename(file_path)}"
                     response = cloudinary.uploader.upload(
                         file_path,
                         resource_type="video",
-                        public_id=public_id,
-                        chunk_size=5 * 1024 * 1024,  # 5MB لكل جزء
-                        timeout=30,  # 30 ثانية كحد أقصى للرفع
-                        quality="auto",
-                        format="mp3"
+                        public_id=public_id
                     )
-                    
-                    uploaded_urls.append({
-                        "url": response['secure_url'],
-                        "duration": response.get('duration', 0),
-                        "part_number": chunk_index + 1,
-                        "size": os.path.getsize(file_path)
-                    })
-                    
-                    # حذف الملف المؤقت بعد الرفع الناجح
+                    uploaded_urls.append(response['secure_url'])
                     os.remove(file_path)
-                    
                 except Exception as e:
-                    print(f"خطأ في رفع الجزء {file_path}: {str(e)}")
-                    failed_uploads.append(file_path)
-                    continue
-
-            # تحديث حالة التسجيل
-            active_recordings[device_id][session_id]['cloudinary_urls'] = uploaded_urls
-            
-            # حذف الملفات الفاشلة بعد المحاولة
-            for file_path in failed_uploads:
-                if os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                    except Exception as e:
-                        print(f"خطأ في حذف الملف الفاشل {file_path}: {str(e)}")
-
-            # إرجاع النتيجة مع تفاصيل الرفع
-            return jsonify({
-                "status": "success",
-                "uploaded_count": len(uploaded_urls),
-                "failed_count": len(failed_uploads),
-                "uploaded_urls": uploaded_urls,
-                "failed_uploads": failed_uploads
-            })
-
-        except Exception as e:
-            print(f"خطأ غير متوقع في رفع الأجزاء: {str(e)}")
-            return jsonify({
-                "status": "error",
-                "message": "حدث خطأ أثناء رفع الأجزاء",
-                "error": str(e)
-            }), 500
-
+                    print(f"خطأ في رفع الجزء {file_path}: {e}")
+        
+        active_recordings[device_id][session_id]['cloudinary_urls'] = uploaded_urls
+        return jsonify({"urls": uploaded_urls})
+        
 @app.route('/get-recording-urls/<device_id>/<session_id>')
 def get_recording_urls(device_id, session_id):
     """الحصول على روابط التسجيلات من Cloudinary"""
