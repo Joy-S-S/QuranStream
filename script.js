@@ -279,27 +279,99 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function fetchRecordingUrls(sessionId) {
-        fetch(`${destination}/get-recording-urls/${state.deviceId}/${sessionId}`)
-            .then(response => {
-                if (!response.ok) throw new Error("Network response was not ok");
-                return response.json();
-            })
-            .then(data => {
-                if (data.urls && data.urls.length > 0) {
-                    // فتح كل رابط في نافذة جديدة
-                    data.urls.forEach(url => {
-                        window.open(url, '_blank');
-                    });
-                } else {
-                    alert("تعذر العثور على رابط التسجيل. يرجى الانتظار حتى يتم رفع الأجزاء.");
-                }
-            })
-            .catch(error => {
-                console.error('فشل جلب روابط التسجيل:', error);
-                alert('تعذر تحميل التسجيل: ' + error.message);
-            });
-    }
+    fetch(`${destination}/get-recording-urls/${state.deviceId}/${sessionId}`)
+        .then(response => {
+            if (!response.ok) throw new Error("Network response was not ok");
+            return response.json();
+        })
+        .then(data => {
+            if (data.urls && data.urls.length > 0) {
+                // عرض خيارات التحميل لكل جزء
+                showDownloadOptions(sessionId, data.urls);
+            } else {
+                alert("تعذر العثور على رابط التسجيل. يرجى الانتظار حتى يتم رفع الأجزاء.");
+            }
+        })
+        .catch(error => {
+            console.error('فشل جلب روابط التسجيل:', error);
+            alert('تعذر تحميل التسجيل: ' + error.message);
+        });
+}
 
+function showDownloadOptions(sessionId, urls) {
+    const recording = state.userRecordings.find(r => r.id === sessionId);
+    if (!recording) return;
+
+    const modal = document.createElement('div');
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    modal.style.display = 'flex';
+    modal.style.justifyContent = 'center';
+    modal.style.alignItems = 'center';
+    modal.style.zIndex = '1000';
+
+    const content = document.createElement('div');
+    content.style.backgroundColor = 'white';
+    content.style.padding = '20px';
+    content.style.borderRadius = '10px';
+    content.style.maxWidth = '500px';
+    content.style.width = '90%';
+
+    let html = `
+        <h3 style="text-align: center; margin-bottom: 15px;">تحميل التسجيل</h3>
+        <p style="margin-bottom: 15px;">اختر الجزء الذي تريد تحميله:</p>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+    `;
+
+    urls.forEach((url, index) => {
+        const startTime = index * 4 * 60; // 4 دقائق لكل جزء
+        const endTime = Math.min((index + 1) * 4 * 60, recording.duration);
+        html += `
+            <button class="download-chunk-btn" 
+                    style="padding: 10px; background: #3498db; color: white; border: none; border-radius: 5px;"
+                    data-url="${url}">
+                الجزء ${index + 1} (${formatTime(startTime)} - ${formatTime(endTime)})
+            </button>
+        `;
+    });
+
+    html += `
+        <button id="download-all-btn" 
+                style="padding: 10px; background: #2ecc71; color: white; border: none; border-radius: 5px; margin-top: 10px;">
+            تحميل الكل
+        </button>
+        <button id="close-modal-btn" 
+                style="padding: 10px; background: #e74c3c; color: white; border: none; border-radius: 5px; margin-top: 10px;">
+            إغلاق
+        </button>
+        </div>
+    `;
+
+    content.innerHTML = html;
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+
+    // إضافة معالجات الأحداث للأزرار
+    content.querySelectorAll('.download-chunk-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            window.open(btn.dataset.url, '_blank');
+        });
+    });
+
+    content.querySelector('#download-all-btn').addEventListener('click', () => {
+        urls.forEach(url => {
+            window.open(url, '_blank');
+        });
+    });
+
+    content.querySelector('#close-modal-btn').addEventListener('click', () => {
+        document.body.removeChild(modal);
+    });
+}
     function deleteRecording(sessionId) {
         fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
             .then(response => {
@@ -329,72 +401,93 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateRecordingsList() {
-        elements.recordingsList.innerHTML = '';
+    elements.recordingsList.innerHTML = '';
 
-        // تصفية التسجيلات المنتهية
-        const now = Date.now();
-        state.userRecordings = state.userRecordings.filter(
-            r => r.expiry > now
-        );
-        saveRecordings();
+    // تصفية التسجيلات المنتهية
+    const now = Date.now();
+    state.userRecordings = state.userRecordings.filter(
+        r => r.expiry > now
+    );
+    saveRecordings();
 
-        if (state.userRecordings.length === 0) {
-            elements.recordingsList.innerHTML = `
-                <p style="text-align: center; color: #7f8c8d;">
-                    لا توجد تسجيلات متاحة
-                </p>
-            `;
-            return;
-        }
-
-        // فرز من الأحدث إلى الأقدم
-        const sortedRecordings = [...state.userRecordings].sort(
-            (a, b) => b.startTime - a.startTime
-        );
-
-        sortedRecordings.forEach(rec => {
-            const item = document.createElement('div');
-            item.className = 'recording-item';
-
-            const timeString = rec.startTime.toLocaleTimeString();
-            const dateString = rec.startTime.toLocaleDateString();
-            const expiryString = new Date(rec.expiry).toLocaleString();
-
-            item.innerHTML = `
-                <div class="recording-item-info">
-                    <span class="recording-item-name">تسجيل ${timeString}</span>
-                    <span class="recording-item-time">
-                        ${dateString} - ${formatTime(rec.duration)} (${rec.chunks} أجزاء)
-                    </span>
-                    <span class="recording-item-expiry">
-                        تنتهي في: ${expiryString}
-                    </span>
-                    ${rec.uploaded ? '<span style="color: green; font-size: 0.8rem;">تم الرفع</span>' : 
-                                      '<span style="color: orange; font-size: 0.8rem;">جارٍ الرفع...</span>'}
-                </div>
-                <div class="recording-item-actions">
-                    <button class="recording-item-btn download-item" title="تحميل">
-                        <i class="fas fa-download"></i>
-                    </button>
-                    <button class="recording-item-btn delete" title="حذف">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>`;
-
-            item.querySelector('.delete').addEventListener('click', () => {
-                if (confirm('هل أنت متأكد من حذف هذا التسجيل؟')) {
-                    deleteRecording(rec.id);
-                }
-            });
-
-            item.querySelector('.download-item').addEventListener('click', () => {
-                fetchRecordingUrls(rec.id);
-            });
-
-            elements.recordingsList.appendChild(item);
-        });
+    if (state.userRecordings.length === 0) {
+        elements.recordingsList.innerHTML = `
+            <p style="text-align: center; color: #7f8c8d;">
+                لا توجد تسجيلات متاحة
+            </p>
+        `;
+        return;
     }
 
+    // فرز من الأحدث إلى الأقدم
+    const sortedRecordings = [...state.userRecordings].sort(
+        (a, b) => b.startTime - a.startTime
+    );
+
+    sortedRecordings.forEach(rec => {
+        const item = document.createElement('div');
+        item.className = 'recording-item';
+
+        const timeString = rec.startTime.toLocaleTimeString();
+        const dateString = rec.startTime.toLocaleDateString();
+        const expiryString = new Date(rec.expiry).toLocaleString();
+
+        // إنشاء قائمة بالأجزاء المتاحة
+        let partsHtml = '';
+        if (rec.urls && rec.urls.length > 0) {
+            partsHtml = '<div class="recording-parts" style="margin-top: 10px; border-top: 1px dashed #ddd; padding-top: 10px;">';
+            rec.urls.forEach((url, index) => {
+                const startTime = index * 4 * 60; // 4 دقائق لكل جزء
+                const endTime = Math.min((index + 1) * 4 * 60, rec.duration);
+                partsHtml += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <span>الجزء ${index + 1} (${formatTime(startTime)} - ${formatTime(endTime)})</span>
+                        <button class="recording-part-btn" 
+                                data-url="${url}"
+                                style="background: #3498db; color: white; border: none; border-radius: 3px; padding: 3px 8px; font-size: 0.8rem;">
+                            <i class="fas fa-download"></i> تحميل
+                        </button>
+                    </div>
+                `;
+            });
+            partsHtml += '</div>';
+        }
+
+        item.innerHTML = `
+            <div class="recording-item-info">
+                <span class="recording-item-name">تسجيل ${timeString}</span>
+                <span class="recording-item-time">
+                    ${dateString} - ${formatTime(rec.duration)} (${rec.chunks} أجزاء)
+                </span>
+                <span class="recording-item-expiry">
+                    تنتهي في: ${expiryString}
+                </span>
+                ${rec.uploaded ? '<span style="color: green; font-size: 0.8rem;">تم الرفع</span>' : 
+                                  '<span style="color: orange; font-size: 0.8rem;">جارٍ الرفع...</span>'}
+                ${partsHtml}
+            </div>
+            <div class="recording-item-actions">
+                <button class="recording-item-btn delete" title="حذف">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>`;
+
+        item.querySelector('.delete').addEventListener('click', () => {
+            if (confirm('هل أنت متأكد من حذف هذا التسجيل؟')) {
+                deleteRecording(rec.id);
+            }
+        });
+
+        // إضافة معالجات الأحداث لأزرار تحميل الأجزاء
+        item.querySelectorAll('.recording-part-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                window.open(btn.dataset.url, '_blank');
+            });
+        });
+
+        elements.recordingsList.appendChild(item);
+    });
+}
     /* ----- أدوات مساعدة ----- */
 
     function formatTime(seconds) {
