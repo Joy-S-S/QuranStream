@@ -498,25 +498,137 @@ function showDownloadOptions(sessionId, urls) {
 
     /* ----- التهيئة ----- */
 
-    function init() {
-        setupAudioControls();
-        setupRecordingControls();
-        setupLibraryControls();
-        loadRecordings();
+/* ----- التاريخ ومواقيت الصلاة ----- */
 
-        // تهيئة حالة زر التشغيل
-        audioElement.addEventListener('loadedmetadata', () => {
-            state.isPlaying = !audioElement.paused;
-            updatePlayButton();
-        });
+function updateDates() {
+    // التاريخ الميلادي
+    const gregorianDate = new Date();
+    const gregorianOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('current-gregorian-date').textContent = 
+        gregorianDate.toLocaleDateString('ar-SA', gregorianOptions);
+    
+    // التاريخ الهجري
+    const hijriDate = new Intl.DateTimeFormat('ar-SA-u-ca-islamic', {
+        day: 'numeric',
+        month: 'long',
+        weekday: 'long',
+        year: 'numeric'
+    }).format(gregorianDate);
+    
+    document.getElementById('current-hijri-date').textContent = hijriDate;
+}
 
-        // بدء التشغيل تلقائياً
-        audioElement.play().catch(error => {
-            console.error('لا يمكن بدء التشغيل التلقائي:', error);
-        });
-        state.isPlaying = true;
-        updatePlayButton();
+function fetchPrayerTimes() {
+    // استخدام API لمواقيت الصلاة بناء على موقع المستخدم
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                const { latitude, longitude } = position.coords;
+                const date = new Date();
+                const formattedDate = `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
+                
+                fetch(`https://api.aladhan.com/v1/timings/${formattedDate}?latitude=${latitude}&longitude=${longitude}&method=4`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const timings = data.data.timings;
+                        displayPrayerTimes(timings);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching prayer times:', error);
+                        displayDefaultPrayerTimes();
+                    });
+            },
+            error => {
+                console.error('Geolocation error:', error);
+                displayDefaultPrayerTimes();
+            }
+        );
+    } else {
+        displayDefaultPrayerTimes();
     }
+}
+
+function displayPrayerTimes(timings) {
+    const prayerTimesContainer = document.getElementById('prayerTimes');
+    const prayersToShow = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    const prayerNames = {
+        'Fajr': 'الفجر',
+        'Dhuhr': 'الظهر',
+        'Asr': 'العصر',
+        'Maghrib': 'المغرب',
+        'Isha': 'العشاء'
+    };
+    
+    let html = '';
+    prayersToShow.forEach(prayer => {
+        html += `
+            <div class="prayer-time">
+                <span class="prayer-name">${prayerNames[prayer]}</span>
+                <span class="time">${timings[prayer]}</span>
+            </div>
+        `;
+    });
+    
+    prayerTimesContainer.innerHTML = html;
+}
+
+function displayDefaultPrayerTimes() {
+    // عرض مواقيت افتراضية في حالة عدم تمكن من الحصول على الموقع
+    document.getElementById('prayerTimes').innerHTML = `
+        <div class="prayer-time">
+            <span class="prayer-name">الفجر</span>
+            <span class="time">04:30</span>
+        </div>
+        <div class="prayer-time">
+            <span class="prayer-name">الظهر</span>
+            <span class="time">12:15</span>
+        </div>
+        <div class="prayer-time">
+            <span class="prayer-name">العصر</span>
+            <span class="time">15:45</span>
+        </div>
+        <div class="prayer-time">
+            <span class="prayer-name">المغرب</span>
+            <span class="time">18:30</span>
+        </div>
+        <div class="prayer-time">
+            <span class="prayer-name">العشاء</span>
+            <span class="time">20:00</span>
+        </div>
+        <p style="text-align: center; font-size: 0.8rem; color: #7f8c8d;">
+            (مواقيت تقديرية - يرجى تفعيل الموقع للحصول على المواقيت الدقيقة)
+        </p>
+    `;
+}
+    
+   function init() {
+    setupAudioControls();
+    setupRecordingControls();
+    setupLibraryControls();
+    loadRecordings();
+    
+    // تهيئة حالة زر التشغيل
+    audioElement.addEventListener('loadedmetadata', () => {
+        state.isPlaying = !audioElement.paused;
+        updatePlayButton();
+    });
+
+    // بدء التشغيل تلقائياً
+    audioElement.play().catch(error => {
+        console.error('لا يمكن بدء التشغيل التلقائي:', error);
+    });
+    state.isPlaying = true;
+    updatePlayButton();
+    
+    // تحديث التاريخ ومواقيت الصلاة
+    updateDates();
+    fetchPrayerTimes();
+    
+    // تحديث التاريخ كل يوم
+    setInterval(updateDates, 86400000);
+}
+
+    
 
     init();
 });
