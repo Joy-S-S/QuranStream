@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     const destination = "https://quranliveradio.up.railway.app";
-    const streamUrl = "https://stream.radiojar.com/8s5u5tpdtwzuv";
-    const audioElement = new Audio(streamUrl);
+    const audioElement = new Audio(`${destination}/stream`);
     document.body.appendChild(audioElement);
 
     // تعريف جميع عناصر DOM
@@ -18,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
         currentYear: document.getElementById('current-year'),
         recordingsLibrary: document.querySelector('.recordings-library'),
         recordingsList: document.getElementById('recordingsList'),
-        toggleLibraryBtn: document.getElementById('toggleLibraryBtn'),
+        toggleLibraryBtn: document.getElementById('toggleLibraryBtn')
     };
 
     // حالة التطبيق
@@ -29,7 +28,8 @@ document.addEventListener('DOMContentLoaded', function () {
         recordingInterval: null,
         recordingSessionId: null,
         deviceId: null,
-        userRecordings: []
+        userRecordings: [],
+        currentChunk: 0
     };
 
     // الثوابت
@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* ----- الوظائف الأساسية ----- */
 
+    // توليد أو استرجاع Device ID
     function initializeDeviceId() {
         let deviceId = localStorage.getItem('deviceId');
         if (!deviceId) {
@@ -51,6 +52,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return deviceId;
     }
 
+    // تحميل التسجيلات المحفوظة
     function loadRecordings() {
         initializeDeviceId();
 
@@ -65,7 +67,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 state.userRecordings = state.userRecordings.map(rec => ({
                     ...rec,
                     startTime: new Date(rec.startTime),
-                    expiry: new Date(rec.expiry).getTime()
+                    expiry: new Date(rec.expiry).getTime(),
+                    chunks: rec.chunks || 1
                 })).filter(rec => rec.expiry > now);
 
                 saveRecordings();
@@ -77,13 +80,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // حفظ التسجيلات
     function saveRecordings() {
         const allRecordings = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+
         allRecordings[state.deviceId] = state.userRecordings.map(rec => ({
             ...rec,
             startTime: rec.startTime.toISOString(),
-            expiry: new Date(rec.expiry).toISOString()
+            expiry: new Date(rec.expiry).toISOString(),
+            chunks: rec.chunks || 1
         }));
+
         localStorage.setItem(STORAGE_KEY, JSON.stringify(allRecordings));
     }
 
@@ -142,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function () {
         elements.recordBtn.addEventListener('click', toggleRecording);
         elements.downloadBtn.addEventListener('click', () => {
             if (state.recordingSessionId) {
-                downloadRecording(state.recordingSessionId);
+                fetchRecordingUrls(state.recordingSessionId);
             }
         });
     }
@@ -151,6 +158,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (state.isRecording) {
             stopRecording();
         } else {
+            // إظهار المكتبة إذا كانت مخفية
             if (elements.recordingsLibrary.classList.contains('hidden')) {
                 elements.recordingsLibrary.classList.remove('hidden');
             }
@@ -162,12 +170,13 @@ document.addEventListener('DOMContentLoaded', function () {
         fetch(`${destination}/start-record/${state.deviceId}`)
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
-                return response.text();
+                return response.json();
             })
-            .then(sessionId => {
-                state.recordingSessionId = sessionId;
+            .then(data => {
+                state.recordingSessionId = data.session_id;
                 state.isRecording = true;
                 state.recordingStartTime = Date.now();
+                state.currentChunk = 0;
 
                 elements.recordBtn.classList.add('recording');
                 elements.recordingInfo.classList.remove('hidden');
@@ -180,11 +189,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 expiryDate.setDate(expiryDate.getDate() + RECORDING_EXPIRY_DAYS);
 
                 state.userRecordings.push({
-                    id: sessionId,
+                    id: state.recordingSessionId,
                     startTime: new Date(),
                     duration: 0,
                     expiry: expiryDate.getTime(),
-                    segments: []
+                    chunks: 1,
+                    uploaded: false
                 });
 
                 saveRecordings();
@@ -218,12 +228,36 @@ document.addEventListener('DOMContentLoaded', function () {
                     recording.duration = Math.floor(
                         (Date.now() - state.recordingStartTime) / 1000
                     );
+                    recording.chunks = state.currentChunk + 1;
                     saveRecordings();
                 }
+
+                // رفع الأجزاء إلى Cloudinary
+                uploadRecordingChunks(state.recordingSessionId);
             })
             .catch(error => {
                 console.error('فشل إيقاف التسجيل:', error);
                 alert('تعذر إيقاف التسجيل. يرجى المحاولة مرة أخرى');
+            });
+    }
+
+    function uploadRecordingChunks(sessionId) {
+        fetch(`${destination}/upload-chunks/${state.deviceId}/${sessionId}`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                const recording = state.userRecordings.find(r => r.id === sessionId);
+                if (recording) {
+                    recording.uploaded = true;
+                    recording.urls = data.urls;
+                    saveRecordings();
+                    updateRecordingsList();
+                }
+            })
+            .catch(error => {
+                console.error('فشل رفع التسجيل:', error);
             });
     }
 
@@ -237,35 +271,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (recording) {
             recording.duration = seconds;
+            // حساب عدد الأجزاء
+            state.currentChunk = Math.floor(seconds / 240); // 4 دقائق
+            recording.chunks = state.currentChunk + 1;
             saveRecordings();
         }
     }
 
-    function downloadRecording(sessionId) {
-        fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
+    function fetchRecordingUrls(sessionId) {
+        fetch(`${destination}/get-recording-urls/${state.deviceId}/${sessionId}`)
             .then(response => {
                 if (!response.ok) throw new Error("Network response was not ok");
                 return response.json();
             })
             .then(data => {
                 if (data.urls && data.urls.length > 0) {
-                    // فتح جميع الأجزاء في نوافذ جديدة
+                    // فتح كل رابط في نافذة جديدة
                     data.urls.forEach(url => {
                         window.open(url, '_blank');
                     });
                 } else {
-                    alert("تعذر العثور على رابط التسجيل حاول بعد قليل اذا ضغطت مباشره بعد ايقاف التسجيل");
+                    alert("تعذر العثور على رابط التسجيل. يرجى الانتظار حتى يتم رفع الأجزاء.");
                 }
             })
             .catch(error => {
-                console.error('فشل تحميل التسجيل:', error);
+                console.error('فشل جلب روابط التسجيل:', error);
                 alert('تعذر تحميل التسجيل: ' + error.message);
             });
     }
 
     function deleteRecording(sessionId) {
-        if (!confirm('هل أنت متأكد من حذف هذا التسجيل؟')) return;
-        
         fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
@@ -304,8 +339,11 @@ document.addEventListener('DOMContentLoaded', function () {
         saveRecordings();
 
         if (state.userRecordings.length === 0) {
-            elements.recordingsList.innerHTML = 
-                '<p style="text-align: center; color: #7f8c8d;">لا توجد تسجيلات متاحة</p>';
+            elements.recordingsList.innerHTML = `
+                <p style="text-align: center; color: #7f8c8d;">
+                    لا توجد تسجيلات متاحة
+                </p>
+            `;
             return;
         }
 
@@ -326,11 +364,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="recording-item-info">
                     <span class="recording-item-name">تسجيل ${timeString}</span>
                     <span class="recording-item-time">
-                        ${dateString} - ${formatTime(rec.duration)}
+                        ${dateString} - ${formatTime(rec.duration)} (${rec.chunks} أجزاء)
                     </span>
                     <span class="recording-item-expiry">
                         تنتهي في: ${expiryString}
                     </span>
+                    ${rec.uploaded ? '<span style="color: green; font-size: 0.8rem;">تم الرفع</span>' : 
+                                      '<span style="color: orange; font-size: 0.8rem;">جارٍ الرفع...</span>'}
                 </div>
                 <div class="recording-item-actions">
                     <button class="recording-item-btn download-item" title="تحميل">
@@ -342,11 +382,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>`;
 
             item.querySelector('.delete').addEventListener('click', () => {
-                deleteRecording(rec.id);
+                if (confirm('هل أنت متأكد من حذف هذا التسجيل؟')) {
+                    deleteRecording(rec.id);
+                }
             });
 
             item.querySelector('.download-item').addEventListener('click', () => {
-                downloadRecording(rec.id);
+                fetchRecordingUrls(rec.id);
             });
 
             elements.recordingsList.appendChild(item);
@@ -374,6 +416,13 @@ document.addEventListener('DOMContentLoaded', function () {
             state.isPlaying = !audioElement.paused;
             updatePlayButton();
         });
+
+        // بدء التشغيل تلقائياً
+        audioElement.play().catch(error => {
+            console.error('لا يمكن بدء التشغيل التلقائي:', error);
+        });
+        state.isPlaying = true;
+        updatePlayButton();
     }
 
     init();
