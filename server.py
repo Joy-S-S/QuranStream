@@ -1,4 +1,3 @@
-from flask_socketio import SocketIO, emit
 from flask import Flask, Response, send_file, send_from_directory, jsonify
 import requests
 import os
