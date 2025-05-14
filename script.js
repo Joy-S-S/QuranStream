@@ -256,7 +256,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (data.url) {
                 window.open(data.url, '_blank');  // يفتح الرابط في نافذة جديدة
             } else {
-                alert("تعذر العثور على رابط التسجيل");
+                alert("تعذر العثور على رابط التسجيل حاول بعد قليل اذا ضغطت مباشره بعد ايقاف التسجيل");
             }
         })
         .catch(error => {
