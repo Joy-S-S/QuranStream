@@ -2,9 +2,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const destination = "https://quranliveradio.up.railway.app";
     let audioElement;
     let retryCount = 0;
-    const MAX_RETRIES = 15; // زيادة عدد المحاولات
-    const INITIAL_RETRY_DELAY = 2000; // 2 ثانية بداية
-    const MAX_RETRY_DELAY = 30000; // 30 ثانية كحد أقصى
+    const MAX_RETRIES = 10;
+    const RETRY_DELAY = 3000;
     let currentRetryDelay = INITIAL_RETRY_DELAY;
     let lastDataTime = Date.now();
     let isUserAction = false;
@@ -48,17 +47,15 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ----- وظائف إدارة البث الصوتي المحسنة ----- */
 
     function initializeAudioStream() {
-        // تنظيف أي موارد سابقة
         cleanupPreviousStream();
-
-        // إنشاء عنصر صوت جديد مع منع التخزين المؤقت
-        audioElement = new Audio(`${destination}/stream?_=${Date.now()}`);
+        
+        audioElement = new Audio(`${destination}/stream?nocache=${Date.now()}`);
         document.body.appendChild(audioElement);
-
-        // إعداد معالجات الأحداث
-        setupAudioEventHandlers();
-
-        // بدء التشغيل التلقائي
+        
+        audioElement.addEventListener('error', handleStreamError);
+        audioElement.addEventListener('playing', handleStreamPlaying);
+        audioElement.addEventListener('ended', handleStreamEnded);
+        
         startPlayback();
     }
 
@@ -69,10 +66,8 @@ document.addEventListener('DOMContentLoaded', function () {
             audioElement.removeEventListener('error', handleStreamError);
             audioElement.removeEventListener('playing', handleStreamPlaying);
             audioElement.removeEventListener('ended', handleStreamEnded);
-            audioElement.removeEventListener('timeupdate', handleTimeUpdate);
             document.body.removeChild(audioElement);
         }
-        clearTimeout(reconnectTimeout);
     }
 
     function setupAudioEventHandlers() {
@@ -86,31 +81,26 @@ document.addEventListener('DOMContentLoaded', function () {
         audioElement.play()
             .then(() => {
                 state.isPlaying = true;
-                lastDataTime = Date.now();
+                retryCount = 0;
                 updatePlayButton();
                 updateStatus('البث المباشر');
-                startHealthCheck();
             })
             .catch(error => {
-                console.error('فشل التشغيل التلقائي:', error);
+                console.error('فشل التشغيل:', error);
                 handleStreamError();
             });
     }
 
     function handleStreamError() {
-        if (isUserAction) return;
-
-        console.error('حدث خطأ في البث');
         if (retryCount < MAX_RETRIES) {
             retryCount++;
-            console.log(`محاولة إعادة اتصال ${retryCount} (التأخير: ${currentRetryDelay}ms)`);
+            console.log(`محاولة إعادة اتصال ${retryCount}/${MAX_RETRIES}`);
             
             updateStatus(`جاري إعادة الاتصال... (${retryCount}/${MAX_RETRIES})`);
             
-            reconnectTimeout = setTimeout(() => {
-                currentRetryDelay = Math.min(currentRetryDelay * 2, MAX_RETRY_DELAY);
+            setTimeout(() => {
                 initializeAudioStream();
-            }, currentRetryDelay);
+            }, RETRY_DELAY);
         } else {
             console.error('تجاوز الحد الأقصى لمحاولات إعادة الاتصال');
             updateStatus('انقطع الاتصال. يرجى المحاولة لاحقًا');
@@ -119,17 +109,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function handleStreamPlaying() {
         console.log('البث يعمل بنجاح');
-        retryCount = 0;
-        currentRetryDelay = INITIAL_RETRY_DELAY;
-        lastDataTime = Date.now();
         updateStatus('البث المباشر');
     }
 
-    function handleStreamEnded() {
+     function handleStreamEnded() {
         console.log('انتهى البث');
-        if (!isUserAction) {
-            handleStreamError();
-        }
+        handleStreamError();
     }
 
     function handleTimeUpdate() {
