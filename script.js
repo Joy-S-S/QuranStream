@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     const destination = "https://quranliveradio.up.railway.app";
-    const audioElement = new Audio(`${destination}/stream`);
+    const audioElement = new Audio("https://stream.radiojar.com/8s5u5tpdtwzuv");
     document.body.appendChild(audioElement);
 
     // تعريف جميع عناصر DOM
