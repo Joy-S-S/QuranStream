@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     const destination = "";
-    const audioElement = new Audio(`${destination}/stream`);
+    const audioElement = new Audio(${destination}/stream);
     document.body.appendChild(audioElement);
 
     // تعريف جميع عناصر DOM
@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function startRecording() {
-        fetch(`${destination}/start-record/${state.deviceId}`)
+        fetch(${destination}/start-record/${state.deviceId})
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
                 return response.text();
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function stopRecording() {
         if (!state.recordingSessionId) return;
 
-        fetch(`${destination}/stop-record/${state.deviceId}/${state.recordingSessionId}`)
+        fetch(${destination}/stop-record/${state.deviceId}/${state.recordingSessionId})
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
 
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function downloadRecording(sessionId) {
-    fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
+    fetch(${destination}/download/${state.deviceId}/${sessionId})
         .then(response => {
             if (!response.ok) throw new Error("Network response was not ok");
             return response.json();
@@ -266,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function () {
 }
 
     function deleteRecording(sessionId) {
-        fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
+        fetch(${destination}/delete-record/${state.deviceId}/${sessionId})
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
 
@@ -304,11 +304,11 @@ document.addEventListener('DOMContentLoaded', function () {
         saveRecordings();
 
         if (state.userRecordings.length === 0) {
-            elements.recordingsList.innerHTML = `
+            elements.recordingsList.innerHTML = 
                 <p style="text-align: center; color: #7f8c8d;">
                     لا توجد تسجيلات متاحة
                 </p>
-            `;
+            ;
             return;
         }
 
@@ -325,7 +325,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const dateString = rec.startTime.toLocaleDateString();
             const expiryString = new Date(rec.expiry).toLocaleString();
 
-            item.innerHTML = `
+            item.innerHTML = 
                 <div class="recording-item-info">
                     <span class="recording-item-name">تسجيل ${timeString}</span>
                     <span class="recording-item-time">
@@ -343,7 +343,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
-            `;
+            ;
 
             item.querySelector('.delete').addEventListener('click', () => {
                 deleteRecording(rec.id);
@@ -362,11 +362,11 @@ document.addEventListener('DOMContentLoaded', function () {
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        return ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')};
     }
 
     function updateListenerCount() {
-        fetch(`${destination}/listener-count`)
+        fetch(${destination}/listener-count)
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
                 return response.text();
@@ -382,22 +382,21 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ----- التهيئة ----- */
 
     function init() {
-    setupAudioControls();
-    setupRecordingControls();
-    setupLibraryControls();
-    loadRecordings();
+        setupAudioControls();
+        setupRecordingControls();
+        setupLibraryControls();
+        loadRecordings();
 
-    // تحديث عدد المستمعين كل 10 ثواني
-    setInterval(updateListenerCount, 10000);
-    updateListenerCount();
+        // تحديث عدد المستمعين كل 10 ثواني
+        setInterval(updateListenerCount, 10000);
+        updateListenerCount();
 
-    // 👇 إضافة هذا السطر لتعيين حالة الزر كبداية (إيقاف تشغيل)
-    state.isPlaying = false;
-    updatePlayButton();
+        // تهيئة حالة زر التشغيل
+        audioElement.addEventListener('loadedmetadata', () => {
+            state.isPlaying = !audioElement.paused;
+            updatePlayButton();
+        });
+    }
 
-    // تهيئة حالة زر التشغيل عند تحميل بيانات الصوت
-    audioElement.addEventListener('loadedmetadata', () => {
-        state.isPlaying = !audioElement.paused;
-        updatePlayButton();
-    });
-}
+    init();
+});
