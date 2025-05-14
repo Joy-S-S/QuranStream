@@ -61,9 +61,16 @@ def serve_static(path):
 
 @app.route('/stream')
 def proxy_stream():
-    # إعادة توجيه مباشر للبث لتجنب مشاكل railway
-    return Response(requests.get(STREAM_URL, stream=True).iter_content(chunk_size=1024), 
-           content_type='audio/mpeg'
+    # إعادة توجيه مباشر للبث مع التعامل مع الأخطاء
+    try:
+        req = requests.get(STREAM_URL, stream=True)
+        return Response(
+            req.iter_content(chunk_size=1024),
+            content_type=req.headers['content-type']
+        )
+    except Exception as e:
+        print(f"Error in streaming: {e}")
+        return Response(status=500)
 
 def record_stream_chunk(device_id, session_id, chunk_index):
     """تسجيل جزء من البث الصوتي"""
