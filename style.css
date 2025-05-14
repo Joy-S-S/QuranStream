@@ -359,6 +359,7 @@ footer .container {
   padding: 20px;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
   margin-left: 20px;
+  border-radius:10px;
 }
 
 .sidebar h3 {
