@@ -36,23 +36,35 @@ def record_stream(device_id, session_id):
                 with open(recording_file, 'wb') as f:
                     while (datetime.now() - start_time).seconds < max_duration and \
                           active_recordings.get(device_id, {}).get(session_id, {}).get('active', False):
-                        chunk = next(r.iter_content(chunk_size=1024), None)
-                        if chunk:
-                            f.write(chunk)
+                        try:
+                            chunk = next(r.iter_content(chunk_size=1024))
+                            if chunk:
+                                f.write(chunk)
+                        except StopIteration:
+                            # إعادة الاتصال إذا انقطع البث
+                            break
             
-            if os.path.exists(recording_file):
+            if os.path.exists(recording_file) and os.path.getsize(recording_file) > 0:
                 public_id = f"quran_radio/{device_id}/recording_{session_id}_part{part_number}"
-                response = cloudinary.uploader.upload(
-                    recording_file,
-                    resource_type="video"
-                )
-                if 'parts' not in active_recordings[device_id][session_id]:
-                    active_recordings[device_id][session_id]['parts'] = []
-                active_recordings[device_id][session_id]['parts'].append({
-                    'url': response['secure_url'],
-                    'public_id': response['public_id']
-                })
-                os.remove(recording_file)
+                try:
+                    response = cloudinary.uploader.upload(
+                        recording_file,
+                        resource_type="video"
+                    )
+                    if 'parts' not in active_recordings[device_id][session_id]:
+                        active_recordings[device_id][session_id]['parts'] = []
+                    active_recordings[device_id][session_id]['parts'].append({
+                        'url': response['secure_url'],
+                        'public_id': response['public_id'],
+                        'size': os.path.getsize(recording_file)
+                    })
+                except Exception as upload_error:
+                    print(f"خطأ في رفع الجزء {part_number}: {upload_error}")
+                finally:
+                    os.remove(recording_file)
+            else:
+                if os.path.exists(recording_file):
+                    os.remove(recording_file)
                 
     except Exception as e:
         print(f"خطأ في التسجيل: {e}")
@@ -60,6 +72,8 @@ def record_stream(device_id, session_id):
         with recordings_lock:
             if device_id in active_recordings and session_id in active_recordings[device_id]:
                 active_recordings[device_id][session_id]['active'] = False
+                # تحديث وقت الانتهاء
+                active_recordings[device_id][session_id]['expiry'] = datetime.now() + timedelta(days=1)
 
 @app.route('/')
 def serve_index():
