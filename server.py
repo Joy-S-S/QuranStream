@@ -8,6 +8,7 @@ import cloudinary
 import cloudinary.uploader
 from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Lock
+import httpx
 
 app = Flask(__name__)
 
@@ -70,10 +71,9 @@ def proxy_stream():
             print(f"مستمع جديد متصل. الإجمالي: {listener_count}")
         
         try:
-            with requests.get(STREAM_URL, stream=True) as r:
-                for chunk in r.iter_content(chunk_size=1024):
-                    if chunk:
-                        yield chunk
+            with httpx.stream("GET", STREAM_URL, timeout=None) as r:
+                for chunk in r.iter_bytes():
+                    yield chunk
         finally:
             with listener_lock:
                 listener_count -= 1
