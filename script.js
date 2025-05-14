@@ -1,9 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
-    // الاتصال بخادم WebSocket
-    const socket = io();
-    const audioElement = new Audio();
-    let mediaSource;
-    let sourceBuffer;
+    const destination = "";
+    const audioElement = new Audio("https://stream.radiojar.com/8s5u5tpdtwzuv");
+    document.body.appendChild(audioElement);
 
     // تعريف جميع عناصر DOM
     const elements = {
@@ -31,8 +29,7 @@ document.addEventListener('DOMContentLoaded', function () {
         recordingInterval: null,
         recordingSessionId: null,
         deviceId: null,
-        userRecordings: [],
-        audioChunks: []
+        userRecordings: []
     };
 
     // الثوابت
@@ -98,10 +95,8 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ----- التحكم في الصوت ----- */
 
     function setupAudioControls() {
-        // تهيئة عنصر الصوت
         audioElement.volume = elements.volumeSlider.value;
 
-        // معالجة أحداث الصوت
         elements.volumeSlider.addEventListener('input', () => {
             audioElement.volume = elements.volumeSlider.value;
         });
@@ -110,13 +105,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         audioElement.addEventListener('timeupdate', updateProgressBar);
         elements.progressBar.addEventListener('input', seekAudio);
-
-        // طلب البث عند النقر على التشغيل
-        elements.playBtn.addEventListener('click', () => {
-            if (state.isPlaying) {
-                socket.emit('request_stream');
-            }
-        });
     }
 
     function togglePlayback() {
@@ -159,10 +147,7 @@ document.addEventListener('DOMContentLoaded', function () {
         elements.recordBtn.addEventListener('click', toggleRecording);
         elements.downloadBtn.addEventListener('click', () => {
             if (state.recordingSessionId) {
-                socket.emit('download_recording', {
-                    device_id: state.deviceId,
-                    session_id: state.recordingSessionId
-                });
+                downloadRecording(state.recordingSessionId);
             }
         });
     }
@@ -171,39 +156,80 @@ document.addEventListener('DOMContentLoaded', function () {
         if (state.isRecording) {
             stopRecording();
         } else {
+            // إظهار المكتبة إذا كانت مخفية
+            if (elements.recordingsLibrary.classList.contains('hidden')) {
+                elements.recordingsLibrary.classList.remove('hidden');
+            }
             startRecording();
         }
     }
 
     function startRecording() {
-        initializeDeviceId();
-        socket.emit('start_recording', { device_id: state.deviceId });
+        fetch(`${destination}/start-record/${state.deviceId}`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.text();
+            })
+            .then(sessionId => {
+                state.recordingSessionId = sessionId;
+                state.isRecording = true;
+                state.recordingStartTime = Date.now();
+
+                elements.recordBtn.classList.add('recording');
+                elements.recordingInfo.classList.remove('hidden');
+                elements.downloadBtn.classList.add('hidden');
+
+                state.recordingInterval = setInterval(updateRecordingTimer, 1000);
+
+                // إضافة تسجيل جديد
+                const expiryDate = new Date();
+                expiryDate.setDate(expiryDate.getDate() + RECORDING_EXPIRY_DAYS);
+
+                state.userRecordings.push({
+                    id: sessionId,
+                    startTime: new Date(),
+                    duration: 0,
+                    expiry: expiryDate.getTime()
+                });
+
+                saveRecordings();
+                updateRecordingsList();
+            })
+            .catch(error => {
+                console.error('فشل بدء التسجيل:', error);
+                alert('تعذر بدء التسجيل. يرجى المحاولة مرة أخرى');
+            });
     }
 
     function stopRecording() {
         if (!state.recordingSessionId) return;
-        
-        socket.emit('stop_recording', {
-            device_id: state.deviceId,
-            session_id: state.recordingSessionId
-        });
-        
-        clearInterval(state.recordingInterval);
-        state.isRecording = false;
-        elements.recordBtn.classList.remove('recording');
-        elements.downloadBtn.classList.remove('hidden');
 
-        // تحديث مدة التسجيل
-        const recording = state.userRecordings.find(
-            r => r.id === state.recordingSessionId
-        );
+        fetch(`${destination}/stop-record/${state.deviceId}/${state.recordingSessionId}`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
 
-        if (recording) {
-            recording.duration = Math.floor(
-                (Date.now() - state.recordingStartTime) / 1000
-            );
-            saveRecordings();
-        }
+                clearInterval(state.recordingInterval);
+                state.isRecording = false;
+
+                elements.recordBtn.classList.remove('recording');
+                elements.downloadBtn.classList.remove('hidden');
+
+                // تحديث مدة التسجيل
+                const recording = state.userRecordings.find(
+                    r => r.id === state.recordingSessionId
+                );
+
+                if (recording) {
+                    recording.duration = Math.floor(
+                        (Date.now() - state.recordingStartTime) / 1000
+                    );
+                    saveRecordings();
+                }
+            })
+            .catch(error => {
+                console.error('فشل إيقاف التسجيل:', error);
+                alert('تعذر إيقاف التسجيل. يرجى المحاولة مرة أخرى');
+            });
     }
 
     function updateRecordingTimer() {
@@ -220,11 +246,40 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function downloadRecording(sessionId) {
+        fetch(`${destination}/download/${state.deviceId}/${sessionId}`)
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.json();
+            })
+            .then(data => {
+                if (data.url) {
+                    window.open(data.url, '_blank');  // يفتح الرابط في نافذة جديدة
+                } else {
+                    alert("تعذر العثور على رابط التسجيل حاول بعد قليل اذا ضغطت مباشره بعد ايقاف التسجيل");
+                }
+            })
+            .catch(error => {
+                console.error('فشل تحميل التسجيل:', error);
+                alert('تعذر تحميل التسجيل: ' + error.message);
+            });
+    }
+
     function deleteRecording(sessionId) {
-        socket.emit('delete_recording', {
-            device_id: state.deviceId,
-            session_id: sessionId
-        });
+        fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                state.userRecordings = state.userRecordings.filter(
+                    r => r.id !== sessionId
+                );
+                saveRecordings();
+                updateRecordingsList();
+            })
+            .catch(error => {
+                console.error('فشل حذف التسجيل:', error);
+                alert('تعذر حذف التسجيل. يرجى التأكد من ايقاف التسجيل  ');
+            });
     }
 
     /* ----- إدارة المكتبة ----- */
@@ -249,12 +304,14 @@ document.addEventListener('DOMContentLoaded', function () {
         saveRecordings();
 
         if (state.userRecordings.length === 0) {
-            elements.recordingsList.innerHTML = 
-                `<p style="text-align: center; color: #7f8c8d;">
-                    لا توجد تسجيلات متاحة
-                </p>`;
+            elements.recordingsList.innerHTML = `
+        <p style="text-align: center; color: #7f8c8d;">
+            لا توجد تسجيلات متاحة
+        </p>
+    `;
             return;
         }
+
 
         // فرز من الأحدث إلى الأقدم
         const sortedRecordings = [...state.userRecordings].sort(
@@ -269,110 +326,38 @@ document.addEventListener('DOMContentLoaded', function () {
             const dateString = rec.startTime.toLocaleDateString();
             const expiryString = new Date(rec.expiry).toLocaleString();
 
-            item.innerHTML = 
-                `<div class="recording-item-info">
-                    <span class="recording-item-name">تسجيل ${timeString}</span>
-                    <span class="recording-item-time">
-                        ${dateString} - ${formatTime(rec.duration)}
-                    </span>
-                    <span class="recording-item-expiry">
-                        تنتهي في: ${expiryString}
-                    </span>
-                </div>
-                <div class="recording-item-actions">
-                    <button class="recording-item-btn download-item" title="تحميل">
-                        <i class="fas fa-download"></i>
-                    </button>
-                    <button class="recording-item-btn delete" title="حذف">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>`;
+            item.innerHTML = `
+    <div class="recording-item-info">
+        <span class="recording-item-name">تسجيل ${timeString}</span>
+        <span class="recording-item-time">
+            ${dateString} - ${formatTime(rec.duration)}
+        </span>
+        <span class="recording-item-expiry">
+            تنتهي في: ${expiryString}
+        </span>
+    </div>
+    <div class="recording-item-actions">
+        <button class="recording-item-btn download-item" title="تحميل">
+            <i class="fas fa-download"></i>
+        </button>
+        <button class="recording-item-btn delete" title="حذف">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+`;
+
 
             item.querySelector('.delete').addEventListener('click', () => {
                 deleteRecording(rec.id);
             });
 
             item.querySelector('.download-item').addEventListener('click', () => {
-                socket.emit('download_recording', {
-                    device_id: state.deviceId,
-                    session_id: rec.id
-                });
+                downloadRecording(rec.id);
             });
 
             elements.recordingsList.appendChild(item);
         });
     }
-
-    /* ----- معالجات WebSocket ----- */
-
-    socket.on('audio_chunk', (data) => {
-        if (!state.isPlaying) return;
-
-        const bytes = new Uint8Array(data.data.match(/.{1,2}/g).map(byte => parseInt(byte, 16));
-        const blob = new Blob([bytes], { type: 'audio/mpeg' });
-        const url = URL.createObjectURL(blob);
-        
-        audioElement.src = url;
-        audioElement.play().catch(e => console.error('Error playing:', e));
-    });
-
-    socket.on('listener_count', (data) => {
-        elements.listenerCount.textContent = data.count;
-    });
-
-    socket.on('recording_started', (data) => {
-        state.recordingSessionId = data.session_id;
-        state.isRecording = true;
-        state.recordingStartTime = Date.now();
-
-        elements.recordBtn.classList.add('recording');
-        elements.recordingInfo.classList.remove('hidden');
-        elements.downloadBtn.classList.add('hidden');
-
-        state.recordingInterval = setInterval(updateRecordingTimer, 1000);
-
-        // إضافة تسجيل جديد
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + RECORDING_EXPIRY_DAYS);
-
-        state.userRecordings.push({
-            id: data.session_id,
-            startTime: new Date(),
-            duration: 0,
-            expiry: expiryDate.getTime()
-        });
-
-        saveRecordings();
-        updateRecordingsList();
-    });
-
-    socket.on('recording_stopped', (data) => {
-        console.log('Recording stopped:', data.session_id);
-    });
-
-    socket.on('recording_url', (data) => {
-        if (data.session_id === state.recordingSessionId) {
-            window.open(data.url, '_blank');
-        }
-    });
-
-    socket.on('recording_deleted', (data) => {
-        state.userRecordings = state.userRecordings.filter(
-            r => r.id !== data.session_id
-        );
-        saveRecordings();
-        updateRecordingsList();
-    });
-
-    socket.on('stream_error', (data) => {
-        console.error('Stream error:', data.message);
-        alert('حدث خطأ في البث: ' + data.message);
-    });
-
-    socket.on('recording_error', (data) => {
-        console.error('Recording error:', data.message);
-        alert('حدث خطأ في التسجيل: ' + data.message);
-    });
 
     /* ----- أدوات مساعدة ----- */
 
@@ -380,6 +365,20 @@ document.addEventListener('DOMContentLoaded', function () {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function updateListenerCount() {
+        fetch(`${destination}/listener-count`)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.text();
+            })
+            .then(count => {
+                elements.listenerCount.textContent = count;
+            })
+            .catch(error => {
+                console.error('فشل تحديث عدد المستمعين:', error);
+            });
     }
 
     /* ----- التهيئة ----- */
@@ -390,15 +389,21 @@ document.addEventListener('DOMContentLoaded', function () {
         setupLibraryControls();
         loadRecordings();
 
+        // تحديث عدد المستمعين كل 10 ثواني
+        setInterval(updateListenerCount, 10000);
+        updateListenerCount();
+
         // تهيئة حالة زر التشغيل
         audioElement.addEventListener('loadedmetadata', () => {
             state.isPlaying = !audioElement.paused;
             updatePlayButton();
         });
-
-        // الاتصال بالخادم عند التحميل
-        socket.connect();
     }
+    const socket = io(); // يتصل تلقائيًا بالسيرفر الحالي
+
+    socket.on('listener_count', count => {
+        elements.listenerCount.textContent = count;
+    });
 
     init();
 });
