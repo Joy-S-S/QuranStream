@@ -3,6 +3,6 @@ requests==2.31.0
 cloudinary==1.38.0
 APScheduler==3.10.4
 gunicorn
-Flask-SocketIO==5.3.6
-python-engineio==4.4.1
-python-socketio==5.8.0
+httpx
+flask-socketio==5.3.6
+eventlet==0.33.3
