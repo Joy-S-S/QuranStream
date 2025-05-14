@@ -2,8 +2,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const destination = "https://quranliveradio.up.railway.app";
     let audioElement;
     let retryCount = 0;
-    const MAX_RETRIES = 5;
-    const RETRY_DELAY = 5000; // 5 ثواني بين المحاولات
+    const MAX_RETRIES = Infinity; // عدد غير محدود من المحاولات
+    const INITIAL_RETRY_DELAY = 1000; // 1 ثانية بداية
+    const MAX_RETRY_DELAY = 30000; // 30 ثانية كحد أقصى للتأخير
+    let currentRetryDelay = INITIAL_RETRY_DELAY;
+    let isIntentionalPause = false;
+    let streamCheckInterval;
 
     // تعريف جميع عناصر DOM
     const elements = {
@@ -20,7 +24,8 @@ document.addEventListener('DOMContentLoaded', function () {
         recordingsLibrary: document.querySelector('.recordings-library'),
         recordingsList: document.getElementById('recordingsList'),
         toggleLibraryBtn: document.getElementById('toggleLibraryBtn'),
-        listenerCount: document.getElementById('listenerCount')
+        listenerCount: document.getElementById('listenerCount'),
+        currentTrack: document.getElementById('current-track')
     };
 
     // حالة التطبيق
@@ -38,11 +43,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const STORAGE_KEY = 'quranRadioRecordings';
     const RECORDING_EXPIRY_DAYS = 1;
 
-    /* ----- وظائف إدارة البث الصوتي ----- */
+    /* ----- وظائف إدارة البث الصوتي المحسنة ----- */
 
     function initializeAudioStream() {
+        // إلغاء أي محاولة سابقة
+        if (audioElement) {
+            audioElement.pause();
+            audioElement.remove();
+            audioElement = null;
+        }
+
         // إنشاء عنصر الصوت الجديد
-        audioElement = new Audio(`${destination}/stream`);
+        audioElement = new Audio(`${destination}/stream?_=${Date.now()}`);
         document.body.appendChild(audioElement);
 
         // إعداد معالجات الأحداث
@@ -51,7 +63,11 @@ document.addEventListener('DOMContentLoaded', function () {
         // بدء التشغيل تلقائياً
         audioElement.play().catch(error => {
             console.error('خطأ في التشغيل التلقائي:', error);
+            handleStreamDisconnect();
         });
+
+        // بدء مراقبة حالة البث
+        startStreamHealthCheck();
     }
 
     function setupAudioElementEvents() {
@@ -59,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
         audioElement.onerror = null;
         audioElement.onended = null;
         audioElement.onplaying = null;
+        audioElement.onpause = null;
 
         // معالجة الأخطاء
         audioElement.onerror = function() {
@@ -76,48 +93,84 @@ document.addEventListener('DOMContentLoaded', function () {
         audioElement.onplaying = function() {
             console.log('البث يعمل بنجاح');
             state.isPlaying = true;
-            retryCount = 0; // إعادة تعيين عداد المحاولات
+            retryCount = 0;
+            currentRetryDelay = INITIAL_RETRY_DELAY;
             updatePlayButton();
+            updateStreamStatus('البث المباشر');
+        };
+
+        // عند الإيقاف
+        audioElement.onpause = function() {
+            if (!isIntentionalPause) {
+                console.log('تم إيقاف البث غير المتعمد');
+                handleStreamDisconnect();
+            }
         };
 
         // تحديث شريط التقدم
         audioElement.ontimeupdate = updateProgressBar;
     }
 
+    function startStreamHealthCheck() {
+        // إيقاف أي فحص سابق
+        if (streamCheckInterval) clearInterval(streamCheckInterval);
+
+        // بدء فحص صحة البث كل 30 ثانية
+        streamCheckInterval = setInterval(() => {
+            if (audioElement && state.isPlaying) {
+                // إذا كان البث متوقفًا ولكن لم يتم إطلاق حدث الخطأ
+                if (audioElement.paused || audioElement.readyState === 0) {
+                    console.log('اكتشاف توقف البث غير المتعمد');
+                    handleStreamDisconnect();
+                }
+            }
+        }, 30000);
+    }
+
     function handleStreamDisconnect() {
         if (retryCount < MAX_RETRIES) {
             retryCount++;
-            console.log(`محاولة إعادة الاتصال ${retryCount}/${MAX_RETRIES}`);
+            console.log(`محاولة إعادة الاتصال ${retryCount} (التأخير: ${currentRetryDelay}ms)`);
             
             // إظهار رسالة للمستخدم
-            showReconnectMessage(retryCount);
+            updateStreamStatus(`إعادة الاتصال... (المحاولة ${retryCount})`);
             
-            // إعادة المحاولة بعد تأخير
-            setTimeout(initializeAudioStream, RETRY_DELAY);
+            // إعادة المحاولة بعد تأخير (باستخدام Exponential Backoff)
+            setTimeout(() => {
+                initializeAudioStream();
+                currentRetryDelay = Math.min(currentRetryDelay * 2, MAX_RETRY_DELAY);
+            }, currentRetryDelay);
         } else {
             console.error('تم تجاوز الحد الأقصى لمحاولات إعادة الاتصال');
-            showMaxRetriesMessage();
+            updateStreamStatus('تعذر الاتصال بالبث. يرجى التأكد من اتصال الإنترنت');
         }
     }
 
-    function showReconnectMessage(count) {
-        const currentTrack = document.getElementById('current-track');
-        const originalText = currentTrack.textContent;
-        currentTrack.textContent = `محاولة إعادة الاتصال (${count}/${MAX_RETRIES})...`;
-        
-        setTimeout(() => {
-            currentTrack.textContent = originalText;
-        }, RETRY_DELAY - 1000);
+    function updateStreamStatus(message) {
+        if (elements.currentTrack) {
+            elements.currentTrack.textContent = message;
+        }
     }
 
-    function showMaxRetriesMessage() {
-        const currentTrack = document.getElementById('current-track');
-        currentTrack.textContent = 'تعذر الاتصال بالبث. يرجى تحديث الصفحة';
-        state.isPlaying = false;
+    function togglePlayback() {
+        if (!audioElement) return;
+
+        isIntentionalPause = !state.isPlaying;
+        
+        if (state.isPlaying) {
+            audioElement.pause();
+            state.isPlaying = false;
+        } else {
+            audioElement.play().catch(error => {
+                console.error('خطأ في التشغيل:', error);
+                handleStreamDisconnect();
+            });
+            state.isPlaying = true;
+        }
         updatePlayButton();
     }
 
-    /* ----- الوظائف الأساسية ----- */
+    /* ----- باقي الوظائف (كما هي بدون تغيير) ----- */
 
     // توليد أو استرجاع Device ID
     function initializeDeviceId() {
@@ -170,38 +223,6 @@ document.addEventListener('DOMContentLoaded', function () {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(allRecordings));
     }
 
-    /* ----- التحكم في الصوت ----- */
-
-    function setupAudioControls() {
-        if (audioElement) {
-            audioElement.volume = elements.volumeSlider.value;
-        }
-
-        elements.volumeSlider.addEventListener('input', () => {
-            if (audioElement) {
-                audioElement.volume = elements.volumeSlider.value;
-            }
-        });
-
-        elements.playBtn.addEventListener('click', togglePlayback);
-        elements.progressBar.addEventListener('input', seekAudio);
-    }
-
-    function togglePlayback() {
-        if (!audioElement) return;
-
-        if (state.isPlaying) {
-            audioElement.pause();
-            state.isPlaying = false;
-        } else {
-            audioElement.play().catch(error => {
-                console.error('خطأ في التشغيل:', error);
-            });
-            state.isPlaying = true;
-        }
-        updatePlayButton();
-    }
-
     function updatePlayButton() {
         elements.playBtn.innerHTML = state.isPlaying
             ? '<i class="fas fa-pause"></i>'
@@ -226,7 +247,20 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    /* ----- التحكم في التسجيلات ----- */
+    function setupAudioControls() {
+        if (audioElement) {
+            audioElement.volume = elements.volumeSlider.value;
+        }
+
+        elements.volumeSlider.addEventListener('input', () => {
+            if (audioElement) {
+                audioElement.volume = elements.volumeSlider.value;
+            }
+        });
+
+        elements.playBtn.addEventListener('click', togglePlayback);
+        elements.progressBar.addEventListener('input', seekAudio);
+    }
 
     function setupRecordingControls() {
         elements.recordBtn.addEventListener('click', toggleRecording);
@@ -366,8 +400,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    /* ----- إدارة المكتبة ----- */
-
     function setupLibraryControls() {
         elements.toggleLibraryBtn.addEventListener('click', () => {
             elements.recordingsLibrary.classList.toggle('hidden');
@@ -438,8 +470,6 @@ document.addEventListener('DOMContentLoaded', function () {
             elements.recordingsList.appendChild(item);
         });
     }
-
-    /* ----- أدوات مساعدة ----- */
 
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
