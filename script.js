@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const destination = "http://192.168.1.8:5000/";
+    const destination = "https://web-production-412fb.up.railway.app/";
     const audioElement = new Audio(`${destination}/stream`);
     document.body.appendChild(audioElement);
 
