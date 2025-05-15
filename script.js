@@ -374,21 +374,27 @@ function showDownloadOptions(sessionId, urls) {
     });
 }
     function deleteRecording(sessionId) {
+    if (confirm('هل أنت متأكد من حذف هذا التسجيل؟ سيتم حذفه نهائياً من السحابة.')) {
         fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
             .then(response => {
                 if (!response.ok) throw new Error('Network response was not ok');
-
+                
+                // تحديث الواجهة بعد الحذف
                 state.userRecordings = state.userRecordings.filter(
                     r => r.id !== sessionId
                 );
                 saveRecordings();
                 updateRecordingsList();
+                
+                // إظهار رسالة نجاح
+                alert('تم حذف التسجيل بنجاح');
             })
             .catch(error => {
                 console.error('فشل حذف التسجيل:', error);
-                alert('تعذر حذف التسجيل. يرجى التأكد من ايقاف التسجيل');
+                alert('تعذر حذف التسجيل. يرجى المحاولة مرة أخرى');
             });
     }
+}
 
     /* ----- إدارة المكتبة ----- */
 
