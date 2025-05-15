@@ -280,23 +280,36 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function fetchRecordingUrls(sessionId) {
-    fetch(`${destination}/get-recording-urls/${state.deviceId}/${sessionId}`)
-        .then(response => {
-            if (!response.ok) throw new Error("Network response was not ok");
-            return response.json();
-        })
-        .then(data => {
-            if (data.urls && data.urls.length > 0) {
-                // عرض خيارات التحميل لكل جزء
-                showDownloadOptions(sessionId, data.urls);
-            } else {
-                alert("تعذر العثور على رابط التسجيل. يرجى الانتظار حتى يتم رفع الأجزاء.");
-            }
-        })
-        .catch(error => {
-            console.error('فشل جلب روابط التسجيل:', error);
-            alert('تعذر تحميل التسجيل: ' + error.message);
-        });
+    const recording = state.userRecordings.find(r => r.id === sessionId);
+    
+    if (recording && recording.urls && recording.urls.length > 0) {
+        // إذا كان لدينا روابط بالفعل، نعرض خيارات التحميل
+        showDownloadOptions(sessionId, recording.urls);
+    } else {
+        // إذا لم تكن هناك روابط، نحاول جلبها من السيرفر
+        fetch(`${destination}/get-recording-urls/${state.deviceId}/${sessionId}`)
+            .then(response => {
+                if (!response.ok) throw new Error("Network response was not ok");
+                return response.json();
+            })
+            .then(data => {
+                if (data.urls && data.urls.length > 0) {
+                    // حفظ الروابط في حالة التسجيل
+                    if (recording) {
+                        recording.urls = data.urls;
+                        saveRecordings();
+                    }
+                    // عرض خيارات التحميل
+                    showDownloadOptions(sessionId, data.urls);
+                } else {
+                    alert("تعذر العثور على رابط التسجيل. يرجى الانتظار حتى يتم رفع الأجزاء.");
+                }
+            })
+            .catch(error => {
+                console.error('فشل جلب روابط التسجيل:', error);
+                alert('تعذر تحميل التسجيل: ' + error.message);
+            });
+    }
 }
 
 function showDownloadOptions(sessionId, urls) {
