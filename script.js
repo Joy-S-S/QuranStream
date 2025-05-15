@@ -515,26 +515,21 @@ function updateDates() {
     document.getElementById('current-gregorian-date').textContent = 
         gregorianDate.toLocaleDateString('ar-EG', gregorianOptions);
     
-    // جلب التاريخ الهجري من API دار الإفتاء المصرية
-    fetch(HIJRI_API_URL)
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
-        .then(data => {
-            if (data && data.HijriDate) {
-                const hijriDate = data.HijriDate;
-                // تنسيق التاريخ الهجري كما يعرضه الموقع الرسمي
-                const hijriDateString = `${hijriDate.WeekDay}، ${hijriDate.Day} ${hijriDate.MonthName} ${hijriDate.Year} هـ`;
-                document.getElementById('current-hijri-date').textContent = hijriDateString;
-            } else {
-                displayDefaultHijriDate();
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching Hijri date:', error);
-            displayDefaultHijriDate();
-        });
+    // إنشاء تاريخ جديد بطرح يوم واحد (لضبط التاريخ الهجري لمصر)
+    const adjustedDate = new Date(gregorianDate);
+    adjustedDate.setDate(adjustedDate.getDate() - 1);
+    
+    // عرض التاريخ الهجري المعدل
+    const hijriOptions = {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        calendar: 'islamic'
+    };
+    
+    const hijriDateString = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', hijriOptions).format(adjustedDate);
+    document.getElementById('current-hijri-date').textContent = hijriDateString;
 }
 
 function displayDefaultHijriDate() {
