@@ -6,6 +6,7 @@ import threading
 import uuid
 import cloudinary
 import cloudinary.uploader
+import cloudinary.api
 from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Lock
 
@@ -133,9 +134,32 @@ def stop_recording(device_id, session_id):
             return "تم إيقاف التسجيل بنجاح", 200
         return "لا يوجد تسجيل نشط لإيقافه", 400
 
+def upload_to_cloudinary(file_path, public_id):
+    """رفع ملف إلى Cloudinary مع إدارة الأخطاء"""
+    try:
+        response = cloudinary.uploader.upload(
+            file_path,
+            resource_type="video",
+            public_id=public_id,
+            overwrite=True
+        )
+        return response['secure_url']
+    except Exception as e:
+        print(f"خطأ في رفع الملف إلى Cloudinary: {e}")
+        return None
+
+def delete_from_cloudinary(public_id):
+    """حذف ملف من Cloudinary"""
+    try:
+        result = cloudinary.api.delete_resources([public_id], resource_type="video")
+        return result.get(public_id, {}).get('result') == 'ok'
+    except Exception as e:
+        print(f"خطأ في حذف الملف من Cloudinary: {e}")
+        return False
+
 @app.route('/upload-chunks/<device_id>/<session_id>')
 def upload_chunks(device_id, session_id):
-    """رفع الأجزاء إلى Cloudinary"""
+    """رفع الأجزاء إلى Cloudinary وحذفها محلياً"""
     with recordings_lock:
         if device_id not in active_recordings or session_id not in active_recordings[device_id]:
             return jsonify({"error": "لا يوجد تسجيل"}), 404
@@ -144,19 +168,26 @@ def upload_chunks(device_id, session_id):
         for file_path in active_recordings[device_id][session_id]['files']:
             if os.path.exists(file_path):
                 try:
-                    public_id = f"quran_radio/{device_id}/recording_{session_id}_{os.path.basename(file_path)}"
-                    response = cloudinary.uploader.upload(
-                        file_path,
-                        resource_type="video",
-                        public_id=public_id
-                    )
-                    uploaded_urls.append(response['secure_url'])
+                    # إنشاء معرف فريد لكل جزء
+                    chunk_index = len(uploaded_urls)
+                    public_id = f"quran_radio/{device_id}/{session_id}_{chunk_index}"
+                    
+                    # رفع الملف إلى Cloudinary
+                    url = upload_to_cloudinary(file_path, public_id)
+                    if url:
+                        uploaded_urls.append({
+                            "url": url,
+                            "public_id": public_id
+                        })
+                    
+                    # حذف الملف المحلي بغض النظر عن نجاح الرفع
                     os.remove(file_path)
                 except Exception as e:
-                    print(f"خطأ في رفع الجزء {file_path}: {e}")
+                    print(f"خطأ في معالجة الجزء {file_path}: {e}")
         
+        # حفظ روابط Cloudinary مع معرفاتها العامة
         active_recordings[device_id][session_id]['cloudinary_urls'] = uploaded_urls
-        return jsonify({"urls": uploaded_urls})
+        return jsonify({"urls": [item["url"] for item in uploaded_urls]})
         
 @app.route('/get-recording-urls/<device_id>/<session_id>')
 def get_recording_urls(device_id, session_id):
@@ -173,7 +204,13 @@ def delete_recording(device_id, session_id):
     with recordings_lock:
         if device_id in active_recordings and session_id in active_recordings[device_id]:
             try:
-                # حذف الملفات المؤقتة
+                # حذف الملفات من Cloudinary أولاً
+                for item in active_recordings[device_id][session_id].get('cloudinary_urls', []):
+                    public_id = item.get("public_id")
+                    if public_id:
+                        delete_from_cloudinary(public_id)
+                
+                # حذف الملفات المحلية إن وجدت
                 for file_path in active_recordings[device_id][session_id].get('files', []):
                     if os.path.exists(file_path):
                         os.remove(file_path)
