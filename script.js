@@ -503,23 +503,32 @@ function showDownloadOptions(sessionId, urls) {
 function updateDates() {
     // التاريخ الميلادي
     const gregorianDate = new Date();
-    const gregorianOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const gregorianOptions = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    };
     document.getElementById('current-gregorian-date').textContent = 
         gregorianDate.toLocaleDateString('ar-SA', gregorianOptions);
     
-    // التاريخ الهجري
+    // التاريخ الهجري المعدل
     const hijriDate = new Intl.DateTimeFormat('ar-SA-u-ca-islamic', {
         day: 'numeric',
         month: 'long',
-        weekday: 'long',
         year: 'numeric'
     }).format(gregorianDate);
     
-    document.getElementById('current-hijri-date').textContent = hijriDate;
+    // إضافة يوم الأسبوع الهجري بشكل منفصل
+    const hijriWeekday = new Intl.DateTimeFormat('ar-SA-u-ca-islamic', {
+        weekday: 'long'
+    }).format(gregorianDate);
+    
+    document.getElementById('current-hijri-date').textContent = 
+        `${hijriWeekday}، ${hijriDate}`;
 }
 
 function fetchPrayerTimes() {
-    // استخدام API لمواقيت الصلاة بناء على موقع المستخدم
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             position => {
@@ -527,7 +536,7 @@ function fetchPrayerTimes() {
                 const date = new Date();
                 const formattedDate = `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
                 
-                fetch(`https://api.aladhan.com/v1/timings/${formattedDate}?latitude=${latitude}&longitude=${longitude}&method=4`)
+                fetch(`https://api.aladhan.com/v1/timings/${formattedDate}?latitude=${latitude}&longitude=${longitude}&method=5`)
                     .then(response => response.json())
                     .then(data => {
                         const timings = data.data.timings;
@@ -548,6 +557,13 @@ function fetchPrayerTimes() {
     }
 }
 
+function convertTo12Hour(time24) {
+    const [hours, minutes] = time24.split(':');
+    const period = hours >= 12 ? 'م' : 'ص';
+    const hours12 = hours % 12 || 12;
+    return `${hours12}:${minutes} ${period}`;
+}
+
 function displayPrayerTimes(timings) {
     const prayerTimesContainer = document.getElementById('prayerTimes');
     const prayersToShow = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
@@ -559,12 +575,19 @@ function displayPrayerTimes(timings) {
         'Isha': 'العشاء'
     };
     
+    // طريقة حساب Umm al-Qura (المستخدمة في السعودية)
+    const adjustedTimings = {
+        ...timings,
+        Fajr: timings.Fajr, // الفجر
+        Isha: timings.Isha // العشاء
+    };
+    
     let html = '';
     prayersToShow.forEach(prayer => {
         html += `
             <div class="prayer-time">
                 <span class="prayer-name">${prayerNames[prayer]}</span>
-                <span class="time">${timings[prayer]}</span>
+                <span class="time">${convertTo12Hour(adjustedTimings[prayer])}</span>
             </div>
         `;
     });
@@ -573,27 +596,26 @@ function displayPrayerTimes(timings) {
 }
 
 function displayDefaultPrayerTimes() {
-    // عرض مواقيت افتراضية في حالة عدم تمكن من الحصول على الموقع
     document.getElementById('prayerTimes').innerHTML = `
         <div class="prayer-time">
             <span class="prayer-name">الفجر</span>
-            <span class="time">04:30</span>
+            <span class="time">4:30 ص</span>
         </div>
         <div class="prayer-time">
             <span class="prayer-name">الظهر</span>
-            <span class="time">12:15</span>
+            <span class="time">12:15 م</span>
         </div>
         <div class="prayer-time">
             <span class="prayer-name">العصر</span>
-            <span class="time">15:45</span>
+            <span class="time">3:45 م</span>
         </div>
         <div class="prayer-time">
             <span class="prayer-name">المغرب</span>
-            <span class="time">18:30</span>
+            <span class="time">6:30 م</span>
         </div>
         <div class="prayer-time">
             <span class="prayer-name">العشاء</span>
-            <span class="time">20:00</span>
+            <span class="time">8:00 م</span>
         </div>
         <p style="text-align: center; font-size: 0.8rem; color: #7f8c8d;">
             (مواقيت تقديرية - يرجى تفعيل الموقع للحصول على المواقيت الدقيقة)
