@@ -502,7 +502,7 @@ function showDownloadOptions(sessionId, urls) {
 /* ----- التاريخ ومواقيت الصلاة ----- */
 
 function updateDates() {
-    // التاريخ الميلادي باللغة العربية (حسب التقويم الميلادي)
+    // التاريخ الميلادي باللغة العربية
     const gregorianDate = new Date();
     const gregorianOptions = { 
         weekday: 'long', 
@@ -515,20 +515,37 @@ function updateDates() {
     document.getElementById('current-gregorian-date').textContent = 
         gregorianDate.toLocaleDateString('ar-EG', gregorianOptions);
     
-    // إنشاء تاريخ جديد بطرح يوم واحد (لضبط التاريخ الهجري لمصر)
-    const adjustedDate = new Date(gregorianDate);
-    adjustedDate.setDate(adjustedDate.getDate() - 1);
+    // الحصول على يوم الأسبوع الحالي (الميلادي)
+    const currentWeekday = gregorianDate.toLocaleDateString('ar-EG', { weekday: 'long' });
     
-    // عرض التاريخ الهجري المعدل
+    // حساب التاريخ الهجري المعدل (بدون تغيير يوم الأسبوع)
     const hijriOptions = {
-        weekday: 'long',
         day: 'numeric',
         month: 'long',
         year: 'numeric',
         calendar: 'islamic'
     };
     
-    const hijriDateString = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', hijriOptions).format(adjustedDate);
+    // إنشاء تاريخ هجري مع ضبط يوم الأسبوع
+    let hijriDateString;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    do {
+        const adjustedDate = new Date(gregorianDate);
+        adjustedDate.setDate(adjustedDate.getDate() - attempts);
+        
+        hijriDateString = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', hijriOptions).format(adjustedDate);
+        const hijriWeekday = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', { weekday: 'long' }).format(adjustedDate);
+        
+        if (hijriWeekday === currentWeekday || attempts >= maxAttempts) {
+            hijriDateString = `${currentWeekday}، ${hijriDateString.split('،')[1]}`;
+            break;
+        }
+        
+        attempts++;
+    } while (attempts < maxAttempts);
+    
     document.getElementById('current-hijri-date').textContent = hijriDateString;
 }
 
