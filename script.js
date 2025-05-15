@@ -501,31 +501,31 @@ function showDownloadOptions(sessionId, urls) {
 /* ----- التاريخ ومواقيت الصلاة ----- */
 
 function updateDates() {
-    // التاريخ الميلادي
+    // التاريخ الميلادي باللغة العربية (ولكن حسب التقويم الميلادي)
     const gregorianDate = new Date();
     const gregorianOptions = { 
         weekday: 'long', 
         year: 'numeric', 
         month: 'long', 
-        day: 'numeric' 
+        day: 'numeric',
+        calendar: 'gregory' // التأكيد على استخدام التقويم الميلادي
     };
+    
     document.getElementById('current-gregorian-date').textContent = 
-        gregorianDate.toLocaleDateString('ar-SA', gregorianOptions);
+        gregorianDate.toLocaleDateString('ar-EG', gregorianOptions);
     
     // التاريخ الهجري المعدل
-    const hijriDate = new Intl.DateTimeFormat('ar-SA-u-ca-islamic', {
+    const hijriOptions = {
+        weekday: 'long',
         day: 'numeric',
         month: 'long',
-        year: 'numeric'
-    }).format(gregorianDate);
+        year: 'numeric',
+        calendar: 'islamic' // استخدام التقويم الهجري
+    };
     
-    // إضافة يوم الأسبوع الهجري بشكل منفصل
-    const hijriWeekday = new Intl.DateTimeFormat('ar-SA-u-ca-islamic', {
-        weekday: 'long'
-    }).format(gregorianDate);
+    const hijriDateString = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', hijriOptions).format(gregorianDate);
     
-    document.getElementById('current-hijri-date').textContent = 
-        `${hijriWeekday}، ${hijriDate}`;
+    document.getElementById('current-hijri-date').textContent = hijriDateString;
 }
 
 function fetchPrayerTimes() {
