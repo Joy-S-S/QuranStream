@@ -515,38 +515,26 @@ function updateDates() {
     document.getElementById('current-gregorian-date').textContent = 
         gregorianDate.toLocaleDateString('ar-EG', gregorianOptions);
     
-    // الحصول على يوم الأسبوع الحالي (الميلادي)
-    const currentWeekday = gregorianDate.toLocaleDateString('ar-EG', { weekday: 'long' });
+    // الحصول على يوم الأسبوع الحالي (بالعربية)
+    const weekdayFormatter = new Intl.DateTimeFormat('ar-EG', { weekday: 'long' });
+    const currentWeekday = weekdayFormatter.format(gregorianDate);
     
-    // حساب التاريخ الهجري المعدل (بدون تغيير يوم الأسبوع)
-    const hijriOptions = {
+    // حساب التاريخ الهجري (بدون يوم الأسبوع)
+    const hijriDateFormatter = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', {
         day: 'numeric',
         month: 'long',
-        year: 'numeric',
-        calendar: 'islamic'
-    };
+        year: 'numeric'
+    });
     
-    // إنشاء تاريخ هجري مع ضبط يوم الأسبوع
-    let hijriDateString;
-    let attempts = 0;
-    const maxAttempts = 3;
+    // إنشاء تاريخ معدل (نطرح يوم واحد لضبط التاريخ الهجري لمصر)
+    const adjustedDate = new Date(gregorianDate);
+    adjustedDate.setDate(adjustedDate.getDate() - 1);
     
-    do {
-        const adjustedDate = new Date(gregorianDate);
-        adjustedDate.setDate(adjustedDate.getDate() - attempts);
-        
-        hijriDateString = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', hijriOptions).format(adjustedDate);
-        const hijriWeekday = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', { weekday: 'long' }).format(adjustedDate);
-        
-        if (hijriWeekday === currentWeekday || attempts >= maxAttempts) {
-            hijriDateString = `${currentWeekday}، ${hijriDateString.split('،')[1]}`;
-            break;
-        }
-        
-        attempts++;
-    } while (attempts < maxAttempts);
+    const hijriDate = hijriDateFormatter.format(adjustedDate);
     
-    document.getElementById('current-hijri-date').textContent = hijriDateString;
+    // عرض النتيجة النهائية
+    document.getElementById('current-hijri-date').textContent = 
+        `${currentWeekday}، ${hijriDate}`;
 }
 
 function displayDefaultHijriDate() {
