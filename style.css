@@ -416,6 +416,22 @@ footer .container {
 }
 
 @media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        order: 2; /* سيظهر بعد العنصر الرئيسي */
+        width: 100%;
+        margin-left: 0;
+        margin-top: 20px;
+    }
+    
+    main.container {
+        order: 1; /* سيظهر أولاً */
+    }
+    
+    /* تعديلات إضافية للهواتف */
     header p {
         font-size: 1rem;
     }
@@ -423,19 +439,14 @@ footer .container {
     .player-info h2 {
         font-size: 1.2rem;
     }
-    .app-container {
-    flex-direction: column;
-  }
-  
-  .sidebar {
-    width: 100%;
-    margin-left: 0;
-    margin-bottom: 20px;
-    order: -1;
-  }
 }
 
+/* للهواتف الصغيرة */
 @media (max-width: 480px) {
+    .sidebar {
+        padding: 15px;
+    }
+    
     .player-controls {
         flex-wrap: wrap;
         gap: 10px;
