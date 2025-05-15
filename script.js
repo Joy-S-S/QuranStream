@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // الثوابت
     const STORAGE_KEY = 'quranRadioRecordings';
     const RECORDING_EXPIRY_DAYS = 1;
+    const HIJRI_API_URL = "http://di107.dar-alifta.org/api/HijriDate?langID=1";
 
     // تهيئة السنة الحالية
     elements.currentYear.textContent = new Date().getFullYear();
@@ -501,30 +502,53 @@ function showDownloadOptions(sessionId, urls) {
 /* ----- التاريخ ومواقيت الصلاة ----- */
 
 function updateDates() {
-    // التاريخ الميلادي باللغة العربية (ولكن حسب التقويم الميلادي)
+    // التاريخ الميلادي باللغة العربية (حسب التقويم الميلادي)
     const gregorianDate = new Date();
     const gregorianOptions = { 
         weekday: 'long', 
         year: 'numeric', 
         month: 'long', 
         day: 'numeric',
-        calendar: 'gregory' // التأكيد على استخدام التقويم الميلادي
+        calendar: 'gregory'
     };
     
     document.getElementById('current-gregorian-date').textContent = 
         gregorianDate.toLocaleDateString('ar-EG', gregorianOptions);
     
-    // التاريخ الهجري المعدل
+    // جلب التاريخ الهجري من API دار الإفتاء المصرية
+    fetch(HIJRI_API_URL)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.HijriDate) {
+                const hijriDate = data.HijriDate;
+                // تنسيق التاريخ الهجري كما يعرضه الموقع الرسمي
+                const hijriDateString = `${hijriDate.WeekDay}، ${hijriDate.Day} ${hijriDate.MonthName} ${hijriDate.Year} هـ`;
+                document.getElementById('current-hijri-date').textContent = hijriDateString;
+            } else {
+                displayDefaultHijriDate();
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching Hijri date:', error);
+            displayDefaultHijriDate();
+        });
+}
+
+function displayDefaultHijriDate() {
+    // عرض تاريخ هجري افتراضي في حالة فشل الاتصال بالخادم
+    const gregorianDate = new Date();
     const hijriOptions = {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
         year: 'numeric',
-        calendar: 'islamic' // استخدام التقويم الهجري
+        calendar: 'islamic'
     };
     
     const hijriDateString = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', hijriOptions).format(gregorianDate);
-    
     document.getElementById('current-hijri-date').textContent = hijriDateString;
 }
 
