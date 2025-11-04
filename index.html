@@ -14,30 +14,41 @@
 
 <body>
     <header>
-        <div class="container">
-            <div class="header-content">
-                <div class="logo-container">
-                    <img src="Logo.png" alt="إذاعة القرآن الكريم">
+    <div class="container">
+        <div class="header-content">
+            <div class="logo-container">
+                <img src="Logo.png" alt="إذاعة القرآن الكريم">
+            </div>
+            
+            <div class="header-text">
+                <h1>إذاعة القرآن الكريم</h1>
+                <p>استمع إلى كلام الله تعالى في أي وقت ومكان</p>
+            </div>
+
+            <div class="prayer-times-header">
+                <div class="prayer-times-container" id="prayerTimes">
+                    <div class="loader">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>جاري تحميل المواقيت...</span>
+                    </div>
                 </div>
-                <div class="header-text">
-                    <h1>إذاعة القرآن الكريم</h1>
-                    <p>استمع إلى كلام الله تعالى في أي وقت ومكان</p>
-                </div>
-                <div class="header-dates">
-                    <div class="date-display">
-                        <div class="gregorian-date">
-                            <i class="fas fa-calendar-day"></i>
-                            <span id="current-gregorian-date"></span>
-                        </div>
-                        <div class="hijri-date">
-                            <i class="fas fa-moon"></i>
-                            <span id="current-hijri-date"></span>
-                        </div>
+            </div>
+
+            <div class="header-dates">
+                <div class="date-display">
+                    <div class="gregorian-date">
+                        <i class="fas fa-calendar-day"></i>
+                        <span id="current-gregorian-date"></span>
+                    </div>
+                    <div class="hijri-date">
+                        <i class="fas fa-moon"></i>
+                        <span id="current-hijri-date"></span>
                     </div>
                 </div>
             </div>
         </div>
-    </header>
+    </div>
+</header>
 
     <div class="app-container">
         <main class="container">
