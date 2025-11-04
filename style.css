@@ -1243,6 +1243,8 @@ header {
 @media (max-width:410px) {
     .prayer-time {
         width: 50px;
+        padding-left: 10px;
+        padding-right: 10px;
     }
 }
 
@@ -1425,4 +1427,5 @@ header {
     transform: none;
     box-shadow: none;
 }
+
 
