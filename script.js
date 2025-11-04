@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const destination = "https://quranlivestream.up.railway.app";
+    const destination = "https://quranliveradio.up.railway.app";
     const audioElement = new Audio("https://stream.radiojar.com/8s5u5tpdtwzuv");
     document.body.appendChild(audioElement);
 
@@ -697,4 +697,3 @@ function displayDefaultPrayerTimes() {
 
     init();
 });
-
