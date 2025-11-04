@@ -504,6 +504,7 @@ main {
     display: flex;
     flex-direction: column;
     gap: 25px;
+    margin-right: 15px;
 }
 
 .quran-verse, .prayer-times-section {
@@ -645,6 +646,7 @@ footer {
         flex-direction: row;
         flex-wrap: wrap;
         justify-content: space-between;
+        margin: 0;
     }
     
     .quran-verse, .prayer-times-section {
@@ -694,6 +696,7 @@ footer {
     
     .sidebar {
         flex-direction: column;
+        margin: 0;
     }
     
     .quran-verse, .prayer-times-section {
@@ -883,6 +886,7 @@ footer {
 
 .delete-btn:hover {
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
 }
 
 /* أجزاء التسجيل */
@@ -983,7 +987,246 @@ footer {
         align-self: flex-end;
     }
 }
+/* Header Styles */
+header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: white;
+    padding: 15px 0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+}
 
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 25px;
+}
 
+.logo-container {
+    width: 70px;
+    height: 70px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
+}
 
+.logo-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
 
+.header-text {
+    flex: 1;
+    text-align: center;
+}
+
+.header-text h1 {
+    font-size: 1.8rem;
+    margin-bottom: 5px;
+    font-weight: 700;
+}
+
+.header-text p {
+    font-size: 1rem;
+    opacity: 0.9;
+    font-weight: 300;
+}
+
+/* مواقيت الصلاة في الهيدر */
+.prayer-times-header {
+    flex: 1.5;
+    display: flex;
+    justify-content: center;
+}
+
+.prayer-times-container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.prayer-time-box {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-align: center;
+    min-width: 70px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: var(--transition);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.prayer-time-box:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.prayer-name {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #000000;
+}
+
+.prayer-time {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #f1c40f;
+}
+
+.header-dates {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
+}
+
+.date-display {
+    text-align: right;
+}
+
+.gregorian-date, .hijri-date {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 5px 0;
+    font-size: 1rem;
+}
+
+.gregorian-date i, .hijri-date i {
+    font-size: 1.1rem;
+}
+
+.hijri-date {
+    color: #f1c40f;
+    font-weight: bold;
+}
+
+/* Loader في الهيدر */
+.prayer-times-header .loader {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+}
+
+.prayer-times-header .loader i {
+    font-size: 1.1rem;
+    color: #f1c40f;
+}
+
+/* إزالة قسم مواقيت الصلاة من السايدبار */
+.sidebar .prayer-times-section {
+    display: none;
+}
+
+/* تحسينات للشاشات المتوسطة */
+@media (max-width: 992px) {
+    .header-content {
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    
+    .logo-container {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .header-text {
+        order: 1;
+        flex-basis: 100%;
+    }
+    
+    .header-text h1 {
+        font-size: 1.5rem;
+    }
+    
+    .prayer-times-header {
+        order: 2;
+        flex-basis: 100%;
+    }
+    
+    .header-dates {
+        order: 3;
+        align-items: center;
+        flex-direction: row;
+        gap: 20px;
+    }
+    
+    .date-display {
+        text-align: center;
+    }
+}
+
+/* تحسينات للشاشات الصغيرة */
+@media (max-width: 768px) {
+    .header-content {
+        gap: 12px;
+    }
+    
+    .prayer-time-box {
+        min-width: 65px;
+        padding: 6px 8px;
+    }
+    
+    .prayer-name {
+        font-size: 0.7rem;
+    }
+    
+    .prayer-time {
+        font-size: 0.8rem;
+    }
+    
+    .header-text h1 {
+        font-size: 1.3rem;
+    }
+    
+    .header-text p {
+        font-size: 0.9rem;
+    }
+    
+    .gregorian-date, .hijri-date {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .prayer-times-container {
+        gap: 6px;
+    }
+    
+    .prayer-time-box {
+        min-width: 60px;
+        padding: 5px 6px;
+    }
+    
+    .prayer-name {
+        font-size: 0.65rem;
+    }
+    
+    .prayer-time {
+        font-size: 0.75rem;
+    }
+    
+    .header-dates {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
