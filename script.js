@@ -432,9 +432,10 @@ function showDownloadOptions(sessionId, urls) {
 
     if (state.userRecordings.length === 0) {
         elements.recordingsList.innerHTML = `
-            <p style="text-align: center; color: #7f8c8d;">
-                لا توجد تسجيلات متاحة
-            </p>
+            <div class="empty-library">
+                <i class="fas fa-folder-open"></i>
+                <p>لا توجد تسجيلات متاحة</p>
+            </div>
         `;
         return;
     }
@@ -448,24 +449,34 @@ function showDownloadOptions(sessionId, urls) {
         const item = document.createElement('div');
         item.className = 'recording-item';
 
-        const timeString = rec.startTime.toLocaleTimeString();
-        const dateString = rec.startTime.toLocaleDateString();
-        const expiryString = new Date(rec.expiry).toLocaleString();
+        const timeString = rec.startTime.toLocaleTimeString('ar-EG', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        const dateString = rec.startTime.toLocaleDateString('ar-EG', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        const expiryString = new Date(rec.expiry).toLocaleString('ar-EG');
 
         // إنشاء قائمة بالأجزاء المتاحة
         let partsHtml = '';
         if (rec.urls && rec.urls.length > 0) {
-            partsHtml = '<div class="recording-parts" style="margin-top: 10px; border-top: 1px dashed #ddd; padding-top: 10px;">';
+            partsHtml = '<div class="recording-parts">';
+            partsHtml += '<h4 class="parts-title">الأجزاء المتاحة:</h4>';
             rec.urls.forEach((url, index) => {
                 const startTime = index * 4 * 60; // 4 دقائق لكل جزء
                 const endTime = Math.min((index + 1) * 4 * 60, rec.duration);
                 partsHtml += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <span>الجزء ${index + 1} (${formatTime(startTime)} - ${formatTime(endTime)})</span>
-                        <button class="recording-part-btn" 
-                                data-url="${url}"
-                                style="background: #3498db; color: white; border: none; border-radius: 3px; padding: 3px 8px; font-size: 0.8rem;">
-                            <i class="fas fa-download"></i> تحميل
+                    <div class="part-item">
+                        <div class="part-info">
+                            <span class="part-name">الجزء ${index + 1}</span>
+                            <span class="part-time">${formatTime(startTime)} - ${formatTime(endTime)}</span>
+                        </div>
+                        <button class="part-download-btn" data-url="${url}">
+                            <i class="fas fa-download"></i>
+                            تحميل
                         </button>
                     </div>
                 `;
@@ -474,32 +485,50 @@ function showDownloadOptions(sessionId, urls) {
         }
 
         item.innerHTML = `
-            <div class="recording-item-info">
-                <span class="recording-item-name">تسجيل ${timeString}</span>
-                <span class="recording-item-time">
-                    ${dateString} - ${formatTime(rec.duration)} (${rec.chunks} أجزاء)
-                </span>
+            <div class="recording-item-header">
+                <div class="recording-main-info">
+                    <div class="recording-icon">
+                        <i class="fas fa-microphone"></i>
+                    </div>
+                    <div class="recording-details">
+                        <span class="recording-item-name">تسجيل ${timeString}</span>
+                        <span class="recording-item-time">
+                            <i class="fas fa-calendar"></i> ${dateString}
+                        </span>
+                        <span class="recording-item-duration">
+                            <i class="fas fa-clock"></i> ${formatTime(rec.duration)}
+                        </span>
+                    </div>
+                </div>
+                <div class="recording-status-badge ${rec.uploaded ? 'uploaded' : 'uploading'}">
+                    ${rec.uploaded ? 
+                        '<i class="fas fa-check-circle"></i> تم الرفع' : 
+                        '<i class="fas fa-sync-alt fa-spin"></i> جارٍ الرفع...'
+                    }
+                </div>
+            </div>
+            <div class="recording-item-footer">
                 <span class="recording-item-expiry">
+                    <i class="fas fa-hourglass-end"></i> 
                     تنتهي في: ${expiryString}
                 </span>
-                ${rec.uploaded ? '<span style="color: green; font-size: 0.8rem;">تم الرفع</span>' : 
-                                  '<span style="color: orange; font-size: 0.8rem;">جارٍ الرفع...</span>'}
-                ${partsHtml}
+                <div class="recording-item-actions">
+                    <button class="recording-item-btn delete-btn" title="حذف التسجيل">
+                        <i class="fas fa-trash"></i>
+                        حذف
+                    </button>
+                </div>
             </div>
-            <div class="recording-item-actions">
-                <button class="recording-item-btn delete" title="حذف">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>`;
+            ${partsHtml}`;
 
-        item.querySelector('.delete').addEventListener('click', () => {
+        item.querySelector('.delete-btn').addEventListener('click', () => {
             if (confirm('هل أنت متأكد من حذف هذا التسجيل؟')) {
                 deleteRecording(rec.id);
             }
         });
 
         // إضافة معالجات الأحداث لأزرار تحميل الأجزاء
-        item.querySelectorAll('.recording-part-btn').forEach(btn => {
+        item.querySelectorAll('.part-download-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 window.open(btn.dataset.url, '_blank');
             });
@@ -697,4 +726,5 @@ function displayDefaultPrayerTimes() {
 
     init();
 });
+
 
