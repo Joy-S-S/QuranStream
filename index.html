@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إذاعة القرآن الكريم - البث المباشر</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
 </head>
@@ -13,18 +15,43 @@
 <body>
     <header>
         <div class="container">
-            <div class="logo-container">
-                <img src="Logo.png" alt="إذاعة القرآن الكريم">
+            <div class="header-content">
+                <div class="logo-container">
+                    <img src="Logo.png" alt="إذاعة القرآن الكريم">
+                </div>
+                <div class="header-text">
+                    <h1>إذاعة القرآن الكريم</h1>
+                    <p>استمع إلى كلام الله تعالى في أي وقت ومكان</p>
+                </div>
+                <div class="header-dates">
+                    <div class="date-display">
+                        <div class="gregorian-date">
+                            <i class="fas fa-calendar-day"></i>
+                            <span id="current-gregorian-date"></span>
+                        </div>
+                        <div class="hijri-date">
+                            <i class="fas fa-moon"></i>
+                            <span id="current-hijri-date"></span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <p>إذاعة القرآن الكريم</p>
         </div>
     </header>
+
     <div class="app-container">
         <main class="container">
             <section class="player-section">
                 <div class="audio-player">
-                    <div class="player-info">
+                    <div class="player-header">
                         <h2 id="current-track">البث المباشر</h2>
+                        <div class="live-indicator">
+                            <span class="live-dot"></span>
+                            <span>مباشر</span>
+                        </div>
+                    </div>
+                    
+                    <div class="player-info">
                         <div class="progress-container">
                             <input type="range" id="progressBar" value="0">
                             <div class="time-display">
@@ -35,7 +62,7 @@
                     </div>
 
                     <div class="player-controls">
-                        <button id="playBtn" class="control-btn">
+                        <button id="playBtn" class="control-btn play-btn">
                             <i class="fas fa-pause"></i>
                         </button>
 
@@ -43,7 +70,7 @@
                             <i class="fas fa-microphone"></i>
                         </button>
 
-                        <button id="toggleLibraryBtn" class="control-btn">
+                        <button id="toggleLibraryBtn" class="control-btn library-btn">
                             <i class="fas fa-folder-open"></i>
                         </button>
 
@@ -54,48 +81,66 @@
                     </div>
 
                     <div id="recordingInfo" class="recording-info hidden">
-                        <i class="fas fa-circle recording-indicator"></i>
+                        <div class="recording-status">
+                            <i class="fas fa-circle recording-indicator"></i>
+                            <span>جاري التسجيل</span>
+                        </div>
                         <span id="recordingTime">00:00</span>
                         <button id="downloadBtn" class="download-btn hidden">
-                            <i class="fas fa-download"></i> تحميل
+                            <i class="fas fa-download"></i> تحميل التسجيل
                         </button>
                     </div>
                 </div>
             </section>
+
             <section class="recordings-library hidden">
-                <h2>مكتبة التسجيلات</h2>
+                <div class="library-header">
+                    <h2><i class="fas fa-folder"></i> مكتبة التسجيلات</h2>
+                    <button class="close-library-btn" id="closeLibraryBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
                 <div id="recordingsList" class="recordings-list">
                     <!-- التسجيلات ستضاف هنا ديناميكياً -->
                 </div>
             </section>
         </main>
+
         <aside class="sidebar">
-            <div class="calendar-section">
-                <h3>التاريخ اليوم</h3>
-                <div class="date-display">
-                    <div class="gregorian-date">
-                        <span id="current-gregorian-date"></span>
-                    </div>
-                    <div class="hijri-date">
-                        <span id="current-hijri-date"></span>
-                    </div>
+            <div class="quran-verse">
+                <h3><i class="fas fa-book-quran"></i> آية اليوم</h3>
+                <div class="verse-content">
+                    <p id="daily-verse">"وَإِذَا سَأَلَكَ عِبَادِي عَنِّي فَإِنِّي قَرِيبٌ ۖ أُجِيبُ دَعْوَةَ الدَّاعِ إِذَا دَعَانِ ۖ فَلْيَسْتَجِيبُوا لِي وَلْيُؤْمِنُوا بِي لَعَلَّهُمْ يَرْشُدُونَ"</p>
+                    <p class="verse-reference">[سورة البقرة: 186]</p>
                 </div>
             </div>
+            
             <div class="prayer-times-section">
-                <h3>مواقيت الصلاة</h3>
+                <h3><i class="fas fa-mosque"></i> مواقيت الصلاة</h3>
                 <div class="prayer-times" id="prayerTimes">
-                    <div class="loader">جاري تحميل المواقيت...</div>
+                    <div class="loader">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>جاري تحميل المواقيت...</span>
+                    </div>
                 </div>
             </div>
         </aside>
     </div>
+
     <footer>
         <div class="container">
             <div class="footer-content">
-                <p>Yousef Sayed@<span id="current-year"></span></p>
+                <div class="footer-info">
+                    <p>Yousef Sayed@<span id="current-year"></span></p>
+                    <p>جميع الحقوق محفوظة</p>
+                </div>
                 <div class="social-links">
-                    <a href="https://www.facebook.com/profile.php?id=61576319680641"><i class="fab fa-facebook"></i></a>
-                    <a href="https://www.linkedin.com/in/yousef-sayed-70456926b/"><i class="fab fa-linkedin"></i></a>
+                    <a href="https://www.facebook.com/profile.php?id=61576319680641" class="social-link">
+                        <i class="fab fa-facebook"></i>
+                    </a>
+                    <a href="https://www.linkedin.com/in/yousef-sayed-70456926b/" class="social-link">
+                        <i class="fab fa-linkedin"></i>
+                    </a>
                 </div>
             </div>
         </div>
@@ -103,5 +148,4 @@
 
     <script src="script.js"></script>
 </body>
-
 </html>
