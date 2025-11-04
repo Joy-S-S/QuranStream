@@ -879,6 +879,7 @@ footer {
     align-items: center;
     gap: 6px;
     font-weight: 500;
+    margin-right:5px;
 }
 
 .delete-btn:hover {
@@ -984,4 +985,5 @@ footer {
         align-self: flex-end;
     }
 }
+
 
