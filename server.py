@@ -9,8 +9,9 @@ import cloudinary.uploader
 import cloudinary.api
 from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Lock
-
+from flask_cors import CORS
 app = Flask(__name__)
+CORS(app)
 
 # إعدادات Cloudinary
 cloudinary.config(
@@ -226,3 +227,4 @@ if __name__ == '__main__':
     os.makedirs(RECORDINGS_DIR, exist_ok=True)
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
