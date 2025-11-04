@@ -132,7 +132,6 @@ main {
     background-color: white;
     border-radius: var(--border-radius);
     padding: 25px;
-    margin-bottom: 25px;
     box-shadow: var(--box-shadow);
     transition: var(--transition);
 }
@@ -647,6 +646,8 @@ footer {
         flex-wrap: wrap;
         justify-content: space-between;
         margin: 0;
+        padding-left: 52px;
+        padding-right: 52px;
     }
     
     .quran-verse, .prayer-times-section {
@@ -702,6 +703,10 @@ footer {
     .quran-verse, .prayer-times-section {
         min-width: 100%;
     }
+    .sidebar{
+        padding-left:40px;
+        padding-right:40px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -713,8 +718,12 @@ footer {
         font-size: 1.5rem;
     }
     
-    .player-section, .recordings-library {
+    .player-section, .recordings-library,.sidebar {
         padding: 15px;
+    }
+    .sidebar{
+        padding-left:25px;
+        padding-right:25px;
     }
     
     .control-btn {
