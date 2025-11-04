@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const destination = "https://quranlivestream.up.railway.app";
+    const destination = "https://quranliveradio.up.railway.app";
     const audioElement = new Audio("https://stream.radiojar.com/8s5u5tpdtwzuv");
     document.body.appendChild(audioElement);
 
@@ -280,80 +280,80 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function fetchRecordingUrls(sessionId) {
-    const recording = state.userRecordings.find(r => r.id === sessionId);
-    
-    if (recording && recording.urls && recording.urls.length > 0) {
-        // إذا كان لدينا روابط بالفعل، نعرض خيارات التحميل
-        showDownloadOptions(sessionId, recording.urls);
-    } else {
-        // إذا لم تكن هناك روابط، نحاول جلبها من السيرفر
-        fetch(`${destination}/get-recording-urls/${state.deviceId}/${sessionId}`)
-            .then(response => {
-                if (!response.ok) throw new Error("Network response was not ok");
-                return response.json();
-            })
-            .then(data => {
-                if (data.urls && data.urls.length > 0) {
-                    // حفظ الروابط في حالة التسجيل
-                    if (recording) {
-                        recording.urls = data.urls;
-                        saveRecordings();
+        const recording = state.userRecordings.find(r => r.id === sessionId);
+
+        if (recording && recording.urls && recording.urls.length > 0) {
+            // إذا كان لدينا روابط بالفعل، نعرض خيارات التحميل
+            showDownloadOptions(sessionId, recording.urls);
+        } else {
+            // إذا لم تكن هناك روابط، نحاول جلبها من السيرفر
+            fetch(`${destination}/get-recording-urls/${state.deviceId}/${sessionId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error("Network response was not ok");
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.urls && data.urls.length > 0) {
+                        // حفظ الروابط في حالة التسجيل
+                        if (recording) {
+                            recording.urls = data.urls;
+                            saveRecordings();
+                        }
+                        // عرض خيارات التحميل
+                        showDownloadOptions(sessionId, data.urls);
+                    } else {
+                        alert("تعذر العثور على رابط التسجيل. يرجى الانتظار حتى يتم رفع الأجزاء.");
                     }
-                    // عرض خيارات التحميل
-                    showDownloadOptions(sessionId, data.urls);
-                } else {
-                    alert("تعذر العثور على رابط التسجيل. يرجى الانتظار حتى يتم رفع الأجزاء.");
-                }
-            })
-            .catch(error => {
-                console.error('فشل جلب روابط التسجيل:', error);
-                alert('تعذر تحميل التسجيل: ' + error.message);
-            });
+                })
+                .catch(error => {
+                    console.error('فشل جلب روابط التسجيل:', error);
+                    alert('تعذر تحميل التسجيل: ' + error.message);
+                });
+        }
     }
-}
 
-function showDownloadOptions(sessionId, urls) {
-    const recording = state.userRecordings.find(r => r.id === sessionId);
-    if (!recording) return;
+    function showDownloadOptions(sessionId, urls) {
+        const recording = state.userRecordings.find(r => r.id === sessionId);
+        if (!recording) return;
 
-    const modal = document.createElement('div');
-    modal.style.position = 'fixed';
-    modal.style.top = '0';
-    modal.style.left = '0';
-    modal.style.width = '100%';
-    modal.style.height = '100%';
-    modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
-    modal.style.display = 'flex';
-    modal.style.justifyContent = 'center';
-    modal.style.alignItems = 'center';
-    modal.style.zIndex = '1000';
+        const modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        modal.style.display = 'flex';
+        modal.style.justifyContent = 'center';
+        modal.style.alignItems = 'center';
+        modal.style.zIndex = '1000';
 
-    const content = document.createElement('div');
-    content.style.backgroundColor = 'white';
-    content.style.padding = '20px';
-    content.style.borderRadius = '10px';
-    content.style.maxWidth = '500px';
-    content.style.width = '90%';
+        const content = document.createElement('div');
+        content.style.backgroundColor = 'white';
+        content.style.padding = '20px';
+        content.style.borderRadius = '10px';
+        content.style.maxWidth = '500px';
+        content.style.width = '90%';
 
-    let html = `
+        let html = `
         <h3 style="text-align: center; margin-bottom: 15px;">تحميل التسجيل</h3>
         <p style="margin-bottom: 15px;">اختر الجزء الذي تريد تحميله:</p>
         <div style="display: flex; flex-direction: column; gap: 10px;">
     `;
 
-    urls.forEach((url, index) => {
-        const startTime = index * 4 * 60; // 4 دقائق لكل جزء
-        const endTime = Math.min((index + 1) * 4 * 60, recording.duration);
-        html += `
+        urls.forEach((url, index) => {
+            const startTime = index * 4 * 60; // 4 دقائق لكل جزء
+            const endTime = Math.min((index + 1) * 4 * 60, recording.duration);
+            html += `
             <button class="download-chunk-btn" 
                     style="padding: 10px; background: #3498db; color: white; border: none; border-radius: 5px;"
                     data-url="${url}">
                 الجزء ${index + 1} (${formatTime(startTime)} - ${formatTime(endTime)})
             </button>
         `;
-    });
+        });
 
-    html += `
+        html += `
         <button id="download-all-btn" 
                 style="padding: 10px; background: #2ecc71; color: white; border: none; border-radius: 5px; margin-top: 10px;">
             تحميل الكل
@@ -365,49 +365,49 @@ function showDownloadOptions(sessionId, urls) {
         </div>
     `;
 
-    content.innerHTML = html;
-    modal.appendChild(content);
-    document.body.appendChild(modal);
+        content.innerHTML = html;
+        modal.appendChild(content);
+        document.body.appendChild(modal);
 
-    // إضافة معالجات الأحداث للأزرار
-    content.querySelectorAll('.download-chunk-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            window.open(btn.dataset.url, '_blank');
-        });
-    });
-
-    content.querySelector('#download-all-btn').addEventListener('click', () => {
-        urls.forEach(url => {
-            window.open(url, '_blank');
-        });
-    });
-
-    content.querySelector('#close-modal-btn').addEventListener('click', () => {
-        document.body.removeChild(modal);
-    });
-}
-    function deleteRecording(sessionId) {
-    if (confirm('هل أنت متأكد من حذف هذا التسجيل؟ سيتم حذفه نهائياً من السحابة.')) {
-        fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                
-                // تحديث الواجهة بعد الحذف
-                state.userRecordings = state.userRecordings.filter(
-                    r => r.id !== sessionId
-                );
-                saveRecordings();
-                updateRecordingsList();
-                
-                // إظهار رسالة نجاح
-                alert('تم حذف التسجيل بنجاح');
-            })
-            .catch(error => {
-                console.error('فشل حذف التسجيل:', error);
-                alert('تعذر حذف التسجيل. يرجى المحاولة مرة أخرى');
+        // إضافة معالجات الأحداث للأزرار
+        content.querySelectorAll('.download-chunk-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                window.open(btn.dataset.url, '_blank');
             });
+        });
+
+        content.querySelector('#download-all-btn').addEventListener('click', () => {
+            urls.forEach(url => {
+                window.open(url, '_blank');
+            });
+        });
+
+        content.querySelector('#close-modal-btn').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
     }
-}
+    function deleteRecording(sessionId) {
+        if (confirm('هل أنت متأكد من حذف هذا التسجيل؟ سيتم حذفه نهائياً من السحابة.')) {
+            fetch(`${destination}/delete-record/${state.deviceId}/${sessionId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+
+                    // تحديث الواجهة بعد الحذف
+                    state.userRecordings = state.userRecordings.filter(
+                        r => r.id !== sessionId
+                    );
+                    saveRecordings();
+                    updateRecordingsList();
+
+                    // إظهار رسالة نجاح
+                    alert('تم حذف التسجيل بنجاح');
+                })
+                .catch(error => {
+                    console.error('فشل حذف التسجيل:', error);
+                    alert('تعذر حذف التسجيل. يرجى المحاولة مرة أخرى');
+                });
+        }
+    }
 
     /* ----- إدارة المكتبة ----- */
 
@@ -421,54 +421,54 @@ function showDownloadOptions(sessionId, urls) {
     }
 
     function updateRecordingsList() {
-    elements.recordingsList.innerHTML = '';
+        elements.recordingsList.innerHTML = '';
 
-    // تصفية التسجيلات المنتهية
-    const now = Date.now();
-    state.userRecordings = state.userRecordings.filter(
-        r => r.expiry > now
-    );
-    saveRecordings();
+        // تصفية التسجيلات المنتهية
+        const now = Date.now();
+        state.userRecordings = state.userRecordings.filter(
+            r => r.expiry > now
+        );
+        saveRecordings();
 
-    if (state.userRecordings.length === 0) {
-        elements.recordingsList.innerHTML = `
+        if (state.userRecordings.length === 0) {
+            elements.recordingsList.innerHTML = `
             <div class="empty-library">
                 <i class="fas fa-folder-open"></i>
                 <p>لا توجد تسجيلات متاحة</p>
             </div>
         `;
-        return;
-    }
+            return;
+        }
 
-    // فرز من الأحدث إلى الأقدم
-    const sortedRecordings = [...state.userRecordings].sort(
-        (a, b) => b.startTime - a.startTime
-    );
+        // فرز من الأحدث إلى الأقدم
+        const sortedRecordings = [...state.userRecordings].sort(
+            (a, b) => b.startTime - a.startTime
+        );
 
-    sortedRecordings.forEach(rec => {
-        const item = document.createElement('div');
-        item.className = 'recording-item';
+        sortedRecordings.forEach(rec => {
+            const item = document.createElement('div');
+            item.className = 'recording-item';
 
-        const timeString = rec.startTime.toLocaleTimeString('ar-EG', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
-        const dateString = rec.startTime.toLocaleDateString('ar-EG', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-        const expiryString = new Date(rec.expiry).toLocaleString('ar-EG');
+            const timeString = rec.startTime.toLocaleTimeString('ar-EG', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            const dateString = rec.startTime.toLocaleDateString('ar-EG', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            const expiryString = new Date(rec.expiry).toLocaleString('ar-EG');
 
-        // إنشاء قائمة بالأجزاء المتاحة
-        let partsHtml = '';
-        if (rec.urls && rec.urls.length > 0) {
-            partsHtml = '<div class="recording-parts">';
-            partsHtml += '<h4 class="parts-title">الأجزاء المتاحة:</h4>';
-            rec.urls.forEach((url, index) => {
-                const startTime = index * 4 * 60; // 4 دقائق لكل جزء
-                const endTime = Math.min((index + 1) * 4 * 60, rec.duration);
-                partsHtml += `
+            // إنشاء قائمة بالأجزاء المتاحة
+            let partsHtml = '';
+            if (rec.urls && rec.urls.length > 0) {
+                partsHtml = '<div class="recording-parts">';
+                partsHtml += '<h4 class="parts-title">الأجزاء المتاحة:</h4>';
+                rec.urls.forEach((url, index) => {
+                    const startTime = index * 4 * 60; // 4 دقائق لكل جزء
+                    const endTime = Math.min((index + 1) * 4 * 60, rec.duration);
+                    partsHtml += `
                     <div class="part-item">
                         <div class="part-info">
                             <span class="part-name">الجزء ${index + 1}</span>
@@ -480,11 +480,11 @@ function showDownloadOptions(sessionId, urls) {
                         </button>
                     </div>
                 `;
-            });
-            partsHtml += '</div>';
-        }
+                });
+                partsHtml += '</div>';
+            }
 
-        item.innerHTML = `
+            item.innerHTML = `
             <div class="recording-item-header">
                 <div class="recording-main-info">
                     <div class="recording-icon">
@@ -501,10 +501,10 @@ function showDownloadOptions(sessionId, urls) {
                     </div>
                 </div>
                 <div class="recording-status-badge ${rec.uploaded ? 'uploaded' : 'uploading'}">
-                    ${rec.uploaded ? 
-                        '<i class="fas fa-check-circle"></i> تم الرفع' : 
-                        '<i class="fas fa-sync-alt fa-spin"></i> جارٍ الرفع...'
-                    }
+                    ${rec.uploaded ?
+                    '<i class="fas fa-check-circle"></i> تم الرفع' :
+                    '<i class="fas fa-sync-alt fa-spin"></i> جارٍ الرفع...'
+                }
                 </div>
             </div>
             <div class="recording-item-footer">
@@ -521,22 +521,22 @@ function showDownloadOptions(sessionId, urls) {
             </div>
             ${partsHtml}`;
 
-        item.querySelector('.delete-btn').addEventListener('click', () => {
-            if (confirm('هل أنت متأكد من حذف هذا التسجيل؟')) {
-                deleteRecording(rec.id);
-            }
-        });
-
-        // إضافة معالجات الأحداث لأزرار تحميل الأجزاء
-        item.querySelectorAll('.part-download-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                window.open(btn.dataset.url, '_blank');
+            item.querySelector('.delete-btn').addEventListener('click', () => {
+                if (confirm('هل أنت متأكد من حذف هذا التسجيل؟')) {
+                    deleteRecording(rec.id);
+                }
             });
-        });
 
-        elements.recordingsList.appendChild(item);
-    });
-}
+            // إضافة معالجات الأحداث لأزرار تحميل الأجزاء
+            item.querySelectorAll('.part-download-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    window.open(btn.dataset.url, '_blank');
+                });
+            });
+
+            elements.recordingsList.appendChild(item);
+        });
+    }
     /* ----- أدوات مساعدة ----- */
 
     function formatTime(seconds) {
@@ -547,128 +547,128 @@ function showDownloadOptions(sessionId, urls) {
 
     /* ----- التهيئة ----- */
 
-/* ----- التاريخ ومواقيت الصلاة ----- */
+    /* ----- التاريخ ومواقيت الصلاة ----- */
 
-function updateDates() {
-    // التاريخ الميلادي باللغة العربية
-    const gregorianDate = new Date();
-    const gregorianOptions = { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric',
-        calendar: 'gregory'
-    };
-    
-    document.getElementById('current-gregorian-date').textContent = 
-        gregorianDate.toLocaleDateString('ar-EG', gregorianOptions);
-    
-    // الحصول على يوم الأسبوع الحالي (بالعربية)
-    const weekdayFormatter = new Intl.DateTimeFormat('ar-EG', { weekday: 'long' });
-    const currentWeekday = weekdayFormatter.format(gregorianDate);
-    
-    // حساب التاريخ الهجري (بدون يوم الأسبوع)
-    const hijriDateFormatter = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-    });
-    
-    // إنشاء تاريخ معدل (نطرح يوم واحد لضبط التاريخ الهجري لمصر)
-    const adjustedDate = new Date(gregorianDate);
-    adjustedDate.setDate(adjustedDate.getDate() - 1);
-    
-    const hijriDate = hijriDateFormatter.format(adjustedDate);
-    
-    // عرض النتيجة النهائية
-    document.getElementById('current-hijri-date').textContent = 
-        `${currentWeekday}، ${hijriDate}`;
-}
+    function updateDates() {
+        // التاريخ الميلادي باللغة العربية
+        const gregorianDate = new Date();
+        const gregorianOptions = {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            calendar: 'gregory'
+        };
 
-function displayDefaultHijriDate() {
-    // عرض تاريخ هجري افتراضي في حالة فشل الاتصال بالخادم
-    const gregorianDate = new Date();
-    const hijriOptions = {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        calendar: 'islamic'
-    };
-    
-    const hijriDateString = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', hijriOptions).format(gregorianDate);
-    document.getElementById('current-hijri-date').textContent = hijriDateString;
-}
+        document.getElementById('current-gregorian-date').textContent =
+            gregorianDate.toLocaleDateString('ar-EG', gregorianOptions);
 
-function fetchPrayerTimes() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            position => {
-                const { latitude, longitude } = position.coords;
-                const date = new Date();
-                const formattedDate = `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
-                
-                fetch(`https://api.aladhan.com/v1/timings/${formattedDate}?latitude=${latitude}&longitude=${longitude}&method=5`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const timings = data.data.timings;
-                        displayPrayerTimes(timings);
-                    })
-                    .catch(error => {
-                        console.error('Error fetching prayer times:', error);
-                        displayDefaultPrayerTimes();
-                    });
-            },
-            error => {
-                console.error('Geolocation error:', error);
-                displayDefaultPrayerTimes();
-            }
-        );
-    } else {
-        displayDefaultPrayerTimes();
+        // الحصول على يوم الأسبوع الحالي (بالعربية)
+        const weekdayFormatter = new Intl.DateTimeFormat('ar-EG', { weekday: 'long' });
+        const currentWeekday = weekdayFormatter.format(gregorianDate);
+
+        // حساب التاريخ الهجري (بدون يوم الأسبوع)
+        const hijriDateFormatter = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+
+        // إنشاء تاريخ معدل (نطرح يوم واحد لضبط التاريخ الهجري لمصر)
+        const adjustedDate = new Date(gregorianDate);
+        adjustedDate.setDate(adjustedDate.getDate() - 1);
+
+        const hijriDate = hijriDateFormatter.format(adjustedDate);
+
+        // عرض النتيجة النهائية
+        document.getElementById('current-hijri-date').textContent =
+            `${currentWeekday}، ${hijriDate}`;
     }
-}
 
-function convertTo12Hour(time24) {
-    const [hours, minutes] = time24.split(':');
-    const period = hours >= 12 ? 'م' : 'ص';
-    const hours12 = hours % 12 || 12;
-    return `${hours12}:${minutes} ${period}`;
-}
+    function displayDefaultHijriDate() {
+        // عرض تاريخ هجري افتراضي في حالة فشل الاتصال بالخادم
+        const gregorianDate = new Date();
+        const hijriOptions = {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            calendar: 'islamic'
+        };
 
-function displayPrayerTimes(timings) {
-    const prayerTimesContainer = document.getElementById('prayerTimes');
-    const prayersToShow = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-    const prayerNames = {
-        'Fajr': 'الفجر',
-        'Dhuhr': 'الظهر',
-        'Asr': 'العصر',
-        'Maghrib': 'المغرب',
-        'Isha': 'العشاء'
-    };
-    
-    // طريقة حساب Umm al-Qura (المستخدمة في السعودية)
-    const adjustedTimings = {
-        ...timings,
-        Fajr: timings.Fajr, // الفجر
-        Isha: timings.Isha // العشاء
-    };
-    
-    let html = '';
-    prayersToShow.forEach(prayer => {
-        html += `
+        const hijriDateString = new Intl.DateTimeFormat('ar-EG-u-ca-islamic', hijriOptions).format(gregorianDate);
+        document.getElementById('current-hijri-date').textContent = hijriDateString;
+    }
+
+    function fetchPrayerTimes() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const { latitude, longitude } = position.coords;
+                    const date = new Date();
+                    const formattedDate = `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
+
+                    fetch(`https://api.aladhan.com/v1/timings/${formattedDate}?latitude=${latitude}&longitude=${longitude}&method=5`)
+                        .then(response => response.json())
+                        .then(data => {
+                            const timings = data.data.timings;
+                            displayPrayerTimes(timings);
+                        })
+                        .catch(error => {
+                            console.error('Error fetching prayer times:', error);
+                            displayDefaultPrayerTimes();
+                        });
+                },
+                error => {
+                    console.error('Geolocation error:', error);
+                    displayDefaultPrayerTimes();
+                }
+            );
+        } else {
+            displayDefaultPrayerTimes();
+        }
+    }
+
+    function convertTo12Hour(time24) {
+        const [hours, minutes] = time24.split(':');
+        const period = hours >= 12 ? 'م' : 'ص';
+        const hours12 = hours % 12 || 12;
+        return `${hours12}:${minutes} ${period}`;
+    }
+
+    function displayPrayerTimes(timings) {
+        const prayerTimesContainer = document.getElementById('prayerTimes');
+        const prayersToShow = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+        const prayerNames = {
+            'Fajr': 'الفجر',
+            'Dhuhr': 'الظهر',
+            'Asr': 'العصر',
+            'Maghrib': 'المغرب',
+            'Isha': 'العشاء'
+        };
+
+        // طريقة حساب Umm al-Qura (المستخدمة في السعودية)
+        const adjustedTimings = {
+            ...timings,
+            Fajr: timings.Fajr, // الفجر
+            Isha: timings.Isha // العشاء
+        };
+
+        let html = '';
+        prayersToShow.forEach(prayer => {
+            html += `
             <div class="prayer-time">
                 <span class="prayer-name">${prayerNames[prayer]}</span>
                 <span class="time">${convertTo12Hour(adjustedTimings[prayer])}</span>
             </div>
         `;
-    });
-    
-    prayerTimesContainer.innerHTML = html;
-}
+        });
 
-function displayDefaultPrayerTimes() {
-    document.getElementById('prayerTimes').innerHTML = `
+        prayerTimesContainer.innerHTML = html;
+    }
+
+    function displayDefaultPrayerTimes() {
+        document.getElementById('prayerTimes').innerHTML = `
         <div class="prayer-time">
             <span class="prayer-name">الفجر</span>
             <span class="time">4:30 ص</span>
@@ -689,42 +689,40 @@ function displayDefaultPrayerTimes() {
             <span class="prayer-name">العشاء</span>
             <span class="time">8:00 م</span>
         </div>
-        <p style="text-align: center; font-size: 0.8rem; color: #7f8c8d;">
+        <p style="text-align: center; font-size: 0.8rem; color: #ffffffff;">
             (مواقيت تقديرية - يرجى تفعيل الموقع للحصول على المواقيت الدقيقة)
         </p>
     `;
-}
-    
-   function init() {
-    setupAudioControls();
-    setupRecordingControls();
-    setupLibraryControls();
-    loadRecordings();
-    
-    // تهيئة حالة زر التشغيل
-    audioElement.addEventListener('loadedmetadata', () => {
-        state.isPlaying = !audioElement.paused;
+    }
+
+    function init() {
+        setupAudioControls();
+        setupRecordingControls();
+        setupLibraryControls();
+        loadRecordings();
+
+        // تهيئة حالة زر التشغيل
+        audioElement.addEventListener('loadedmetadata', () => {
+            state.isPlaying = !audioElement.paused;
+            updatePlayButton();
+        });
+
+        // بدء التشغيل تلقائياً
+        audioElement.play().catch(error => {
+            console.error('لا يمكن بدء التشغيل التلقائي:', error);
+        });
+        state.isPlaying = true;
         updatePlayButton();
-    });
 
-    // بدء التشغيل تلقائياً
-    audioElement.play().catch(error => {
-        console.error('لا يمكن بدء التشغيل التلقائي:', error);
-    });
-    state.isPlaying = true;
-    updatePlayButton();
-    
-    // تحديث التاريخ ومواقيت الصلاة
-    updateDates();
-    fetchPrayerTimes();
-    
-    // تحديث التاريخ كل يوم
-    setInterval(updateDates, 86400000);
-}
+        // تحديث التاريخ ومواقيت الصلاة
+        updateDates();
+        fetchPrayerTimes();
 
-    
+        // تحديث التاريخ كل يوم
+        setInterval(updateDates, 86400000);
+    }
+
+
 
     init();
 });
-
-
