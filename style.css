@@ -883,7 +883,6 @@ footer {
 
 .delete-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
 }
 
 /* أجزاء التسجيل */
@@ -984,6 +983,7 @@ footer {
         align-self: flex-end;
     }
 }
+
 
 
 
