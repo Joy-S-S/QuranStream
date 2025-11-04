@@ -1238,6 +1238,12 @@ header {
         flex-direction: column;
         gap: 5px;
     }
+    
+}
+@media (max-width:410px) {
+    .prayer-time {
+        width: 60px;
+    }
 }
 
 /* تحسينات الـ Progress Bar للبث المباشر */
