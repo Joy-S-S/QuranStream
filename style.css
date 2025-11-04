@@ -736,3 +736,252 @@ footer {
         align-self: flex-end;
     }
 }
+/* مكتبة التسجيلات المحسنة */
+.empty-library {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-light);
+}
+
+.empty-library i {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    color: #bdc3c7;
+}
+
+.empty-library p {
+    font-size: 1.1rem;
+}
+
+.recording-item {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin-bottom: 15px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: var(--transition);
+}
+
+.recording-item:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+}
+
+.recording-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.recording-main-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    flex: 1;
+}
+
+.recording-icon {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+}
+
+.recording-details {
+    flex: 1;
+}
+
+.recording-item-name {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--dark-color);
+    display: block;
+    margin-bottom: 5px;
+}
+
+.recording-item-time,
+.recording-item-duration {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    color: var(--text-light);
+    margin-bottom: 3px;
+}
+
+.recording-item-time i,
+.recording-item-duration i {
+    width: 16px;
+    text-align: center;
+}
+
+.recording-status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.recording-status-badge.uploaded {
+    background: rgba(39, 174, 96, 0.1);
+    color: var(--success-color);
+    border: 1px solid rgba(39, 174, 96, 0.2);
+}
+
+.recording-status-badge.uploading {
+    background: rgba(243, 156, 18, 0.1);
+    color: var(--warning-color);
+    border: 1px solid rgba(243, 156, 18, 0.2);
+}
+
+.recording-item-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.recording-item-expiry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--danger-color);
+    font-weight: 500;
+}
+
+.recording-item-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.delete-btn {
+    background: linear-gradient(135deg, var(--danger-color), #c0392b);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+
+.delete-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+}
+
+/* أجزاء التسجيل */
+.recording-parts {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px dashed #e9ecef;
+}
+
+.parts-title {
+    font-size: 1rem;
+    color: var(--dark-color);
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.part-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid #e9ecef;
+    transition: var(--transition);
+}
+
+.part-item:hover {
+    background: #f8f9fa;
+    border-color: var(--accent-color);
+}
+
+.part-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.part-name {
+    font-weight: 600;
+    color: var(--dark-color);
+    font-size: 0.95rem;
+}
+
+.part-time {
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+.part-download-btn {
+    background: linear-gradient(135deg, var(--success-color), #219653);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    min-width: 100px;
+    justify-content: center;
+}
+
+.part-download-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+    background: linear-gradient(135deg, #219653, #1e8449);
+}
+
+/* تحسينات للشاشات الصغيرة */
+@media (max-width: 768px) {
+    .recording-item-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .recording-item-footer {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+    
+    .recording-item-actions {
+        align-self: flex-end;
+    }
+    
+    .part-item {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+    
+    .part-download-btn {
+        align-self: flex-end;
+    }
+}
+
