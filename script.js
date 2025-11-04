@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const destination = "https://quranliveradio.up.railway.app";
+    const destination = "https://quranlivestream.up.railway.app";
     const audioElement = new Audio("https://stream.radiojar.com/8s5u5tpdtwzuv");
     document.body.appendChild(audioElement);
 
@@ -98,17 +98,25 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ----- التحكم في الصوت ----- */
 
     function setupAudioControls() {
+    audioElement.volume = elements.volumeSlider.value;
+
+    elements.volumeSlider.addEventListener('input', () => {
         audioElement.volume = elements.volumeSlider.value;
+    });
 
-        elements.volumeSlider.addEventListener('input', () => {
-            audioElement.volume = elements.volumeSlider.value;
-        });
+    elements.playBtn.addEventListener('click', togglePlayback);
 
-        elements.playBtn.addEventListener('click', togglePlayback);
-
-        audioElement.addEventListener('timeupdate', updateProgressBar);
-        elements.progressBar.addEventListener('input', seekAudio);
-    }
+    audioElement.addEventListener('timeupdate', updateProgressBar);
+    audioElement.addEventListener('loadedmetadata', updateProgressBar);
+    
+    // إضافة تحكم في التقديم فقط إذا لم يكن بثاً مباشراً
+    elements.progressBar.addEventListener('input', seekAudio);
+    
+    // تحديث حالة الـ progress bar عند بدء التشغيل
+    audioElement.addEventListener('play', () => {
+        updateProgressBar();
+    });
+}
 
     function togglePlayback() {
         if (state.isPlaying) {
@@ -129,6 +137,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateProgressBar() {
+    // للبث المباشر، نعرض وقت التشغيل الحالي فقط
+    if (audioElement.duration === Infinity || isNaN(audioElement.duration)) {
+        // بث مباشر - إظهار وقت التشغيل فقط
+        elements.currentTime.textContent = formatTime(audioElement.currentTime);
+        elements.duration.textContent = 'مباشر';
+        elements.progressBar.value = 0; // قيمة ثابتة للبث المباشر
+        
+        // إضافة مؤشر البث المباشر
+        if (!document.querySelector('.live-stream-indicator')) {
+            const indicator = document.createElement('div');
+            indicator.className = 'live-stream-indicator';
+            indicator.innerHTML = `
+                <span class="dot"></span>
+                <span>بث مباشر - لا يمكن التقديم</span>
+            `;
+            elements.progressContainer.appendChild(indicator);
+            elements.progressContainer.classList.add('disabled');
+        }
+    } else {
+        // ملف عادي - السلوك الطبيعي
         elements.currentTime.textContent = formatTime(audioElement.currentTime);
         elements.progressBar.value = audioElement.duration
             ? (audioElement.currentTime / audioElement.duration) * 100
@@ -136,13 +164,26 @@ document.addEventListener('DOMContentLoaded', function () {
         elements.duration.textContent = audioElement.duration
             ? formatTime(audioElement.duration)
             : '--:--';
-    }
-
-    function seekAudio() {
-        if (audioElement.duration) {
-            audioElement.currentTime = (elements.progressBar.value / 100) * audioElement.duration;
+        
+        // إزالة مؤشر البث المباشر إذا كان موجوداً
+        const indicator = document.querySelector('.live-stream-indicator');
+        if (indicator) {
+            indicator.remove();
+            elements.progressContainer.classList.remove('disabled');
         }
     }
+}
+
+    function seekAudio() {
+    // منع التقديم في البث المباشر
+    if (audioElement.duration === Infinity || isNaN(audioElement.duration)) {
+        return;
+    }
+    
+    if (audioElement.duration) {
+        audioElement.currentTime = (elements.progressBar.value / 100) * audioElement.duration;
+    }
+}
 
     /* ----- التحكم في التسجيلات ----- */
 
@@ -540,10 +581,18 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ----- أدوات مساعدة ----- */
 
     function formatTime(seconds) {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
+    if (isNaN(seconds)) return '00:00';
+    
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hrs > 0) {
+        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
+}
 
     /* ----- التهيئة ----- */
 
